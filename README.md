@@ -1,3 +1,24 @@
+# run
+1. package name(defined in package.xml): vins, process name(defined in ridgeback_viwo.launch): viwo_node
+2. source devel/setup.bash
+3. `roslaunch vins ridgeback_viwo.launch` viwo_node will die, so run rviz and viwo_node seperately
+4. `roslaunch vins vins_rviz.launch &`
+5. `rosrun vins viwo_node config/realsense_d435i/realsense_stereo_imu_config_ridgeback.yaml &`
+6. `rosbag play data/ridgeback_dark.bag` can't play bag in the background
+7. debug topics published in visualization.cpp::registerPub(), as for "/vins_estimator/image_track", red-circle stands for good-tracking feature, blue-circle stands for bad-tracking feature, green-arrow stands for feature movement.
+
+# get env ready
+1. docker pull ros:melodic
+2. docker run --gpus all -it -v `pwd`:`pwd` -w `pwd` --ipc=host  -v /etc/localtime:/etc/localtime:ro -v /tmp/.X11-unix:/tmp/.X11-unix -e DISPLAY=unix$DISPLAY -e GDK_SCALE -e GDK_DPI_SCALE --network host ros:melodic /bin/bash
+3. install ceres solver
+4. install sophus
+5. install other libraries:
+apt install ros-melodic-image-transport
+apt install ros-melodic-tf
+apt install ros-melodic-cv-bridge
+apt install libopencv-dev
+
+
 # VIW-Fusion
 ## An visual-inertial-wheel fusion odometry
 VIW-Fusion is an optimization-based viusla-inertial-wheel fusion odometry, which is developed as a part of my master thesis. First of all, I need to thank HKUST Aerial Robotics Group led by Prof. Shaojie Shen for their outstanding work [VINS-Fusion](https://github.com/HKUST-Aerial-Robotics/VINS-Fusion). VIW-Fusion is developed based on VINS-Fusion.
