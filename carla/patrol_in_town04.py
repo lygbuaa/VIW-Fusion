@@ -375,6 +375,7 @@ class KeyboardControl(object):
         return (key == K_ESCAPE) or (key == K_q and pygame.key.get_mods() & KMOD_CTRL)
 
 def game_loop(args):
+    # os.environ["SDL_VIDEODRIVER"] = "dummy"
     pygame.init()
     pygame.font.init()
     world = None
@@ -447,7 +448,7 @@ def game_loop(args):
                     return
                 display_manager.render()
                 scene_wrapper.tick(clock)
-                hud.render(display)
+                # hud.render(display)
                 pygame.display.flip()
             except KeyboardInterrupt:
                 g_logger.warn("KeyboardInterrupt!")
@@ -532,7 +533,7 @@ def main():
         help='max throttle of vehicle, 1.0 means 160km/h, 0.4 means 15km/h, 0.2 means 5km/h (default: 0.35)')
     argparser.add_argument(
         '--visualization',
-        default='god_view',
+        default='camera',
         help='enable visualization, radar, lidar, camera or anything else, separately, not the same time')
 
     args = argparser.parse_args()
@@ -547,7 +548,7 @@ def main():
         game_loop(args)
 
     except KeyboardInterrupt:
-        glogger.warn('\nCancelled by user. Bye!')
+        g_logger.warn('\nCancelled by user. Bye!')
 
 
 def test():

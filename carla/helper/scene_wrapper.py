@@ -44,7 +44,9 @@ class SceneWrapper(object):
         self.world = carla_world
         self.display_manager = display_manager
         self.parking_lot_location = carla.Location(x=290.0, y=-180.0, z=0.0) # parking lot in Town04
+        self.rear_axle_midpoint = carla.Location(x=-1.42, y=0.0, z=0.33)
         self.sync = args.sync
+        self.visualization = args.visualization
         self.actor_role_name = args.rolename
         try:
             self.map = self.world.get_map()
@@ -142,18 +144,24 @@ class SceneWrapper(object):
         self.lane_invasion_sensor = LaneInvasionSensor(self.player, self.hud)
         self.gnss_sensor = GnssSensor(self.player)
         self.imu_sensor = IMUSensor(self.player)
-        self.godview_camera = CameraWrapper(
-            world=self.world, 
-            display_man=self.display_manager, 
-            sensor_type='RGBCamera',
-            transform=carla.Transform(carla.Location(x=-5.0, y=0.0, z=3.0), carla.Rotation(pitch=0.0)),
-            attached=self.player,
-            sensor_options={},
-            display_pos=[0, 0]
-        )
-
         actor_type = get_actor_display_name(self.player)
         self.hud.notification(actor_type)
+
+        # godview camera is always on
+        if self.visualization == "radar": #grid_size = [3, 3]
+            self.create_godview_camera(disp_pos=[2, 1])
+            self.create_radar_set()
+
+        elif self.visualization == "lidar": #grid_size = [2, 3]
+            self.create_godview_camera(disp_pos=[1, 1])
+            self.create_lidar_set()
+
+        elif self.visualization == "camera": #grid_size = [4, 3]
+            self.create_godview_camera(disp_pos=[3, 2])
+            self.create_camera_set()
+
+        else: #grid_size = [1, 1]
+            self.create_godview_camera(disp_pos=[0, 0])
 
         if self.sync:
             self.world.tick()
@@ -247,3 +255,194 @@ class SceneWrapper(object):
     def print_vehicle_status(self, ego_vehicle):
         ego_control = ego_vehicle.get_control()
         g_logger.info("ego steer: %f, throttle: %f, brake: %f", ego_control.steer, ego_control.throttle, ego_control.brake)
+
+    ###########################################
+    ## make sensors
+    ###########################################
+    def create_godview_camera(self, disp_pos=[0, 0]):
+        self.godview_camera = CameraWrapper(
+            world=self.world, 
+            display_man=self.display_manager, 
+            sensor_type='RGBCamera',
+            transform=carla.Transform(carla.Location(x=-5.0, y=0.0, z=3.0), carla.Rotation(pitch=0.0)),
+            attached=self.player,
+            sensor_options={'fov':'120.0'},
+            display_pos=disp_pos
+        )
+
+    def create_radar_set(self):
+        self.radar_lrr = RadarWrapper(
+            world=self.world, 
+            display_man=self.display_manager, 
+            sensor_type='Radar',
+            transform=carla.Transform(carla.Location(x=2.53, y=0.0, z=0.63), carla.Rotation()),
+            attached=self.player,
+            sensor_options={'horizontal_fov':'9.0', 'points_per_second':'15000', 'range':'150.0', 'sensor_tick':'0.05', 'vertical_fov':'10.0'},
+            display_pos=[0, 1]
+        )
+        self.radar_srr_front_left = RadarWrapper(
+            world=self.world, 
+            display_man=self.display_manager, 
+            sensor_type='Radar',
+            transform=carla.Transform(carla.Location(x=2.23, y=-1.0, z=0.63), carla.Rotation(yaw=-45.0)),
+            attached=self.player,
+            sensor_options={'horizontal_fov':'150.0', 'points_per_second':'15000', 'range':'100.0', 'sensor_tick':'0.05', 'vertical_fov':'10.0'},
+            display_pos=[0, 0]
+        )
+        self.radar_srr_front_right = RadarWrapper(
+            world=self.world, 
+            display_man=self.display_manager, 
+            sensor_type='Radar',
+            transform=carla.Transform(carla.Location(x=2.23, y=1.0, z=0.63), carla.Rotation(yaw=45.0)),
+            attached=self.player,
+            sensor_options={'horizontal_fov':'150.0', 'points_per_second':'15000', 'range':'100.0', 'sensor_tick':'0.05', 'vertical_fov':'10.0'},
+            display_pos=[0, 2]
+        )
+        self.radar_srr_rear_left = RadarWrapper(
+            world=self.world, 
+            display_man=self.display_manager, 
+            sensor_type='Radar',
+            transform=carla.Transform(carla.Location(x=-2.42, y=-1.0, z=0.63), carla.Rotation(yaw=-135.0)),
+            attached=self.player,
+            sensor_options={'horizontal_fov':'150.0', 'points_per_second':'15000', 'range':'100.0', 'sensor_tick':'0.05', 'vertical_fov':'10.0'},
+            display_pos=[1, 0]
+        )
+        self.radar_srr_rear_right = RadarWrapper(
+            world=self.world, 
+            display_man=self.display_manager, 
+            sensor_type='Radar',
+            transform=carla.Transform(carla.Location(x=-2.42, y=-1.0, z=0.63), carla.Rotation(yaw=135.0)),
+            attached=self.player,
+            sensor_options={'horizontal_fov':'150.0', 'points_per_second':'15000', 'range':'100.0', 'sensor_tick':'0.05', 'vertical_fov':'10.0'},
+            display_pos=[1, 2]
+        )
+
+    def create_lidar_set(self):
+        self.lidar_front = LidarWrapper(
+            world=self.world, 
+            display_man=self.display_manager, 
+            sensor_type='LiDAR',
+            transform=carla.Transform(carla.Location(x=2.48, y=0.0, z=0.73), carla.Rotation()),
+            attached=self.player,
+            sensor_options={'channels':'64', 'range':'100.0', 'points_per_second':'1536000', 'rotation_frequency':'10', 'horizontal_fov':'120.0', 'upper_fov':'15.0', 'lower_fov':'-10.0', 'sensor_tick':'0.1'},
+            display_pos=[0, 1]
+        )
+        self.lidar_left = LidarWrapper(
+            world=self.world, 
+            display_man=self.display_manager, 
+            sensor_type='LiDAR',
+            transform=carla.Transform(carla.Location(x=2.18, y=-1.0, z=0.73), carla.Rotation(yaw=-90.0)),
+            attached=self.player,
+            sensor_options={'channels':'64', 'range':'100.0', 'points_per_second':'1536000', 'rotation_frequency':'10', 'horizontal_fov':'120.0', 'upper_fov':'15.0', 'lower_fov':'-10.0', 'sensor_tick':'0.1'},
+            display_pos=[0, 0]
+        )
+        self.lidar_right = LidarWrapper(
+            world=self.world, 
+            display_man=self.display_manager, 
+            sensor_type='LiDAR',
+            transform=carla.Transform(carla.Location(x=2.18, y=1.0, z=0.73), carla.Rotation(yaw=90.0)),
+            attached=self.player,
+            sensor_options={'channels':'64', 'range':'100.0', 'points_per_second':'1536000', 'rotation_frequency':'10', 'horizontal_fov':'120.0', 'upper_fov':'15.0', 'lower_fov':'-10.0', 'sensor_tick':'0.1'},
+            display_pos=[0, 2]
+        )
+
+    def create_camera_set(self):
+        self.camera_flwc = CameraWrapper(
+            world=self.world, 
+            display_man=self.display_manager, 
+            sensor_type='RGBCamera',
+            transform=carla.Transform(carla.Location(x=0.48, y=0.0, z=1.53), carla.Rotation()),
+            attached=self.player,
+            sensor_options={'fov':'120.0', 'image_size_x':'1920', 'image_size_y':'1080', 'sensor_tick':'0.033'},
+            display_pos=[0, 1]
+        )
+        self.camera_fltc = CameraWrapper(
+            world=self.world, 
+            display_man=self.display_manager, 
+            sensor_type='RGBCamera',
+            transform=carla.Transform(carla.Location(x=0.48, y=0.0, z=1.58), carla.Rotation()),
+            attached=self.player,
+            sensor_options={'fov':'30.0', 'image_size_x':'1920', 'image_size_y':'1080', 'sensor_tick':'0.033'},
+            display_pos=[1, 1]
+        )
+        self.camera_sflc_left = CameraWrapper(
+            world=self.world, 
+            display_man=self.display_manager, 
+            sensor_type='RGBCamera',
+            transform=carla.Transform(carla.Location(x=0.63, y=-1.0, z=1.03), carla.Rotation(yaw=-50.0)),
+            attached=self.player,
+            sensor_options={'fov':'100.0', 'image_size_x':'1920', 'image_size_y':'1080', 'sensor_tick':'0.033'},
+            display_pos=[0, 0]
+        )
+        self.camera_sflc_right = CameraWrapper(
+            world=self.world, 
+            display_man=self.display_manager, 
+            sensor_type='RGBCamera',
+            transform=carla.Transform(carla.Location(x=0.63, y=1.0, z=1.03), carla.Rotation(yaw=50.0)),
+            attached=self.player,
+            sensor_options={'fov':'100.0', 'image_size_x':'1920', 'image_size_y':'1080', 'sensor_tick':'0.033'},
+            display_pos=[0, 2]
+        )
+        self.camera_srlc_left = CameraWrapper(
+            world=self.world, 
+            display_man=self.display_manager, 
+            sensor_type='RGBCamera',
+            transform=carla.Transform(carla.Location(x=-0.42, y=-1.0, z=1.03), carla.Rotation(yaw=-130.0)),
+            attached=self.player,
+            sensor_options={'fov':'100.0', 'image_size_x':'1920', 'image_size_y':'1080', 'sensor_tick':'0.033'},
+            display_pos=[1, 0]
+        )
+        self.camera_srlc_right = CameraWrapper(
+            world=self.world, 
+            display_man=self.display_manager, 
+            sensor_type='RGBCamera',
+            transform=carla.Transform(carla.Location(x=-0.42, y=1.0, z=1.03), carla.Rotation(yaw=130.0)),
+            attached=self.player,
+            sensor_options={'fov':'100.0', 'image_size_x':'1920', 'image_size_y':'1080', 'sensor_tick':'0.033'},
+            display_pos=[1, 2]
+        )
+        self.camera_rlc = CameraWrapper(
+            world=self.world,
+            display_man=self.display_manager, 
+            sensor_type='RGBCamera',
+            transform=carla.Transform(carla.Location(x=-1.22, y=0.0, z=1.53), carla.Rotation(yaw=180.0)),
+            attached=self.player,
+            sensor_options={'fov':'60.0', 'image_size_x':'1920', 'image_size_y':'1080', 'sensor_tick':'0.033'},
+            display_pos=[3, 0]
+        )
+        self.camera_svc_front = CameraWrapper(
+            world=self.world,
+            display_man=self.display_manager, 
+            sensor_type='RGBCamera',
+            transform=carla.Transform(carla.Location(x=2.58, y=0.0, z=0.73), carla.Rotation(pitch=-30.0, yaw=0.0)),
+            attached=self.player,
+            sensor_options={'fov':'160.0', 'image_size_x':'1920', 'image_size_y':'1080', 'sensor_tick':'0.033', 'lens_k':'0.0', 'lens_x_size':'0.0', 'lens_y_size':'0.0'},
+            display_pos=[2, 1]
+        )
+        self.camera_svc_rear = CameraWrapper(
+            world=self.world,
+            display_man=self.display_manager, 
+            sensor_type='RGBCamera',
+            transform=carla.Transform(carla.Location(x=-2.62, y=0.0, z=0.73), carla.Rotation(pitch=-30.0, yaw=180.0)),
+            attached=self.player,
+            sensor_options={'fov':'160.0', 'image_size_x':'1920', 'image_size_y':'1080', 'sensor_tick':'0.033'},
+            display_pos=[3, 1]
+        )
+        self.camera_svc_left = CameraWrapper(
+            world=self.world,
+            display_man=self.display_manager, 
+            sensor_type='RGBCamera',
+            transform=carla.Transform(carla.Location(x=0.08, y=-1.1, z=0.73), carla.Rotation(pitch=-30.0, yaw=-90.0)),
+            attached=self.player,
+            sensor_options={'fov':'160.0', 'image_size_x':'1920', 'image_size_y':'1080', 'sensor_tick':'0.033'},
+            display_pos=[2, 0]
+        )
+        self.camera_svc_right = CameraWrapper(
+            world=self.world,
+            display_man=self.display_manager, 
+            sensor_type='RGBCamera',
+            transform=carla.Transform(carla.Location(x=0.08, y=1.1, z=0.73), carla.Rotation(pitch=-30.0, yaw=90.0)),
+            attached=self.player,
+            sensor_options={'fov':'160.0', 'image_size_x':'1920', 'image_size_y':'1080', 'sensor_tick':'0.033'},
+            display_pos=[2, 2]
+        )        

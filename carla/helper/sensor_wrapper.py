@@ -30,6 +30,9 @@ except ImportError:
     raise RuntimeError('cannot import pygame, make sure pygame package is installed')
     
 from helper.carla_utils import get_actor_blueprints, find_weather_presets, get_actor_display_name, get_nearest_spawn_point
+from utils import plogging
+global g_logger
+g_logger = plogging.get_logger()
 
 class CustomTimer(object):
     def __init__(self):
@@ -43,7 +46,7 @@ class CustomTimer(object):
 
 
 class SensorWrapperBase(object):
-    def __init__(self, world, display_man, display_pos):
+    def __init__(self, world, display_man, display_pos, sensor_type):
         self.surface = None
         self.world = world
         self.display_man = display_man
@@ -52,6 +55,8 @@ class SensorWrapperBase(object):
         self.time_processing = 0.0
         self.tics_processing = 0
         self.sensor = None
+        self.t_start = self.timer.time()
+        self.sensor_type = sensor_type
 
     def render(self):
         if self.surface is not None:
@@ -61,11 +66,18 @@ class SensorWrapperBase(object):
     def destroy(self):
         if self.sensor:
             self.sensor.destroy()
+            self.sensor = None
+        dt = self.timer.time() - self.t_start
+        g_logger.info("[%s] tics: %d, dt: %f, fps: %f", self.sensor_type, self.tics_processing, dt, self.tics_processing/dt)
+
+    def __del__(self):
+        if self.sensor:
+            self.destroy()
 
 
 class RadarWrapper(SensorWrapperBase):
     def __init__(self, world, display_man, sensor_type, transform, attached, sensor_options, display_pos):
-        SensorWrapperBase.__init__(self, world, display_man, display_pos)
+        SensorWrapperBase.__init__(self, world, display_man, display_pos, sensor_type)
         self.sensor = self.init_sensor(sensor_type, transform, attached, sensor_options)
         self.sensor_options = sensor_options
         self.display_man.add_sensor(self)
@@ -83,18 +95,47 @@ class RadarWrapper(SensorWrapperBase):
             return None
 
     def save_radar_image(self, radar_data):
-        t_start = self.timer.time()
-        points = np.frombuffer(radar_data.raw_data, dtype=np.dtype('f4'))
-        points = np.reshape(points, (len(radar_data), 4))
+        points_2d = np.zeros(shape=(len(radar_data), 2), dtype=np.float)
+        disp_size = self.display_man.get_display_size()
+        radar_range = float(self.sensor_options['range'])
+        radar_rot = radar_data.transform.rotation
+        g_logger.info("radar_range: {}, point num: {}, disp_size: {}, transform: {}".format(radar_range, len(radar_data), disp_size, radar_data.transform))
+        # carla.RadarDetection
+        for idx, detect in enumerate(radar_data):
+            dist = detect.depth
+            if dist > radar_range:
+                g_logger.warn("radar dist exceed range: {}".format(dist))
+                dist = radar_range            
+            # image left is forward looking
+            vec_3d = carla.Vector3D(
+                x=dist*math.cos(detect.altitude)*math.cos(detect.azimuth),
+                y=dist*math.cos(detect.altitude)*math.sin(detect.azimuth),
+                z=dist*math.sin(detect.altitude))
+            carla.Transform(carla.Location(), radar_rot).transform(vec_3d)
 
-        t_end = self.timer.time()
-        self.time_processing += (t_end-t_start)
+            points_2d[idx, 0] = vec_3d.x
+            points_2d[idx, 1] = vec_3d.y
+            points_2d[idx, :] *= min(disp_size) / 2.0 / radar_range
+            points_2d[idx, :] += (0.5 * disp_size[0], 0.5 * disp_size[1])
+            # print("point-{}: {}, {}".format(idx, points_2d[idx, 0], points_2d[idx, 1]))
+
+        radar_data = points_2d[:, :2]
+        radar_data = np.fabs(radar_data)  # pylint: disable=E1111
+        radar_data = radar_data.astype(np.int32)
+        radar_data = np.reshape(radar_data, (-1, 2))
+        radar_img_size = (disp_size[0], disp_size[1], 3)
+        radar_img = np.zeros((radar_img_size), dtype=np.uint8)
+
+        radar_img[tuple(radar_data.T)] = (255, 255, 255)
+
+        if self.display_man.render_enabled():
+            self.surface = pygame.surfarray.make_surface(radar_img)
         self.tics_processing += 1
 
 
 class LidarWrapper(SensorWrapperBase):
     def __init__(self, world, display_man, sensor_type, transform, attached, sensor_options, display_pos):
-        SensorWrapperBase.__init__(self, world, display_man, display_pos)
+        SensorWrapperBase.__init__(self, world, display_man, display_pos, sensor_type)
         self.sensor = self.init_sensor(sensor_type, transform, attached, sensor_options)
         self.sensor_options = sensor_options
         self.display_man.add_sensor(self)
@@ -120,10 +161,22 @@ class LidarWrapper(SensorWrapperBase):
 
         disp_size = self.display_man.get_display_size()
         lidar_range = 2.0*float(self.sensor_options['range'])
+        lidar_rot = image.transform.rotation
 
         points = np.frombuffer(image.raw_data, dtype=np.dtype('f4'))
         points = np.reshape(points, (int(points.shape[0] / 4), 4))
-        lidar_data = np.array(points[:, :2])
+        points_3d = np.zeros(shape=(points.shape[0], 3), dtype=np.float)
+        for idx, point in enumerate(points):
+            vec_3d = carla.Vector3D(
+                x=float(point[0]),
+                y=float(point[1]),
+                z=float(point[2]))
+            carla.Transform(carla.Location(), lidar_rot).transform(vec_3d)
+            points_3d[idx, 0] = vec_3d.x
+            points_3d[idx, 1] = vec_3d.y
+            points_3d[idx, 2] = vec_3d.z
+
+        lidar_data = np.array(points_3d[:, :2])
         lidar_data *= min(disp_size) / lidar_range
         lidar_data += (0.5 * disp_size[0], 0.5 * disp_size[1])
         lidar_data = np.fabs(lidar_data)  # pylint: disable=E1111
@@ -144,7 +197,7 @@ class LidarWrapper(SensorWrapperBase):
 
 class CameraWrapper(SensorWrapperBase):
     def __init__(self, world, display_man, sensor_type, transform, attached, sensor_options, display_pos):
-        SensorWrapperBase.__init__(self, world, display_man, display_pos)
+        SensorWrapperBase.__init__(self, world, display_man, display_pos, sensor_type)
         self.sensor = self.init_sensor(sensor_type, transform, attached, sensor_options)
         self.sensor_options = sensor_options
         self.display_man.add_sensor(self)
@@ -153,11 +206,10 @@ class CameraWrapper(SensorWrapperBase):
         if sensor_type == 'RGBCamera':
             camera_bp = self.world.get_blueprint_library().find('sensor.camera.rgb')
             disp_size = self.display_man.get_display_size()
-            camera_bp.set_attribute('image_size_x', str(disp_size[0]))
-            camera_bp.set_attribute('image_size_y', str(disp_size[1]))
             for key in sensor_options:
                 camera_bp.set_attribute(key, sensor_options[key])
-
+            camera_bp.set_attribute('image_size_x', str(disp_size[0]))
+            camera_bp.set_attribute('image_size_y', str(disp_size[1]))
             camera = self.world.spawn_actor(camera_bp, transform, attach_to=attached)
             camera.listen(self.save_rgb_image)
             return camera

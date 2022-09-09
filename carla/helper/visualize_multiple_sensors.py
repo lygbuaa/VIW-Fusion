@@ -29,7 +29,7 @@ except IndexError:
 import carla
 import argparse
 import random
-import time
+import time, math
 import numpy as np
 
 
@@ -52,6 +52,7 @@ class CustomTimer:
 
 class DisplayManager:
     def __init__(self, grid_size, window_size):
+        # os.environ["SDL_VIDEODRIVER"] = "dummy"
         pygame.init()
         pygame.font.init()
         self.display = pygame.display.set_mode(window_size, pygame.HWSURFACE | pygame.DOUBLEBUF)
@@ -237,8 +238,41 @@ class SensorManager:
 
     def save_radar_image(self, radar_data):
         t_start = self.timer.time()
-        points = np.frombuffer(radar_data.raw_data, dtype=np.dtype('f4'))
-        points = np.reshape(points, (len(radar_data), 4))
+        points_2d = np.zeros(shape=(len(radar_data), 2), dtype=np.float)
+        disp_size = self.display_man.get_display_size()
+        radar_range = float(self.sensor_options['range'])
+        radar_rot = radar_data.transform.rotation
+        print("radar_range: {}, point num: {}, disp_size: {}, transform: {}".format(radar_range, len(radar_data), disp_size, radar_data.transform))
+        # carla.RadarDetection
+        for idx, detect in enumerate(radar_data):
+            dist = detect.depth
+            if dist > radar_range:
+                print("radar dist exceed range: {}".format(dist))
+                dist = radar_range
+            # image left is forward looking
+            vec_3d = carla.Vector3D(
+                x=dist*math.cos(detect.altitude)*math.cos(detect.azimuth),
+                y=dist*math.cos(detect.altitude)*math.sin(detect.azimuth),
+                z=dist*math.sin(detect.altitude))
+            carla.Transform(carla.Location(), radar_rot).transform(vec_3d)
+
+            points_2d[idx, 0] = vec_3d.x
+            points_2d[idx, 1] = vec_3d.y
+            points_2d[idx, :] *= min(disp_size) / 2.0 / radar_range
+            points_2d[idx, :] += (0.5 * disp_size[0], 0.5 * disp_size[1])
+            print("point-{}: {}, {}".format(idx, points_2d[idx, 0], points_2d[idx, 1]))
+
+        radar_data = points_2d[:, :2]
+        radar_data = np.fabs(radar_data)  # pylint: disable=E1111
+        radar_data = radar_data.astype(np.int32)
+        radar_data = np.reshape(radar_data, (-1, 2))
+        radar_img_size = (disp_size[0], disp_size[1], 3)
+        radar_img = np.zeros((radar_img_size), dtype=np.uint8)
+
+        radar_img[tuple(radar_data.T)] = (255, 0, 0)
+
+        if self.display_man.render_enabled():
+            self.surface = pygame.surfarray.make_surface(radar_img)
 
         t_end = self.timer.time()
         self.time_processing += (t_end-t_start)
@@ -297,11 +331,16 @@ def run_simulation(args, client):
                       vehicle, {}, display_pos=[0, 2])
         SensorManager(world, display_manager, 'RGBCamera', carla.Transform(carla.Location(x=0, z=2.4), carla.Rotation(yaw=180)), 
                       vehicle, {}, display_pos=[1, 1])
-
         SensorManager(world, display_manager, 'LiDAR', carla.Transform(carla.Location(x=0, z=2.4)), 
-                      vehicle, {'channels' : '64', 'range' : '100',  'points_per_second': '250000', 'rotation_frequency': '20'}, display_pos=[1, 0])
-        SensorManager(world, display_manager, 'SemanticLiDAR', carla.Transform(carla.Location(x=0, z=2.4)), 
-                      vehicle, {'channels' : '64', 'range' : '100', 'points_per_second': '100000', 'rotation_frequency': '20'}, display_pos=[1, 2])
+                      vehicle, {'channels':'64', 'range':'100.0', 'points_per_second':'1536000', 'rotation_frequency':'10', 'horizontal_fov':'120.0', 'upper_fov':'10.0', 'lower_fov':'-15.0'}, display_pos=[1, 0])
+
+
+        # SensorManager(world, display_manager, 'LiDAR', carla.Transform(carla.Location(x=0, z=2.4)), 
+        #               vehicle, {'channels' : '64', 'range' : '100',  'points_per_second': '250000', 'rotation_frequency': '20'}, display_pos=[1, 0])
+        # SensorManager(world, display_manager, 'SemanticLiDAR', carla.Transform(carla.Location(x=0, z=2.4)), 
+        #               vehicle, {'channels' : '64', 'range' : '100', 'points_per_second': '100000', 'rotation_frequency': '20'}, display_pos=[1, 2])
+        SensorManager(world, display_manager, 'Radar', carla.Transform(carla.Location(x=0, z=0.0)), 
+                      vehicle, {'horizontal_fov':'150.0', 'points_per_second':'1500', 'range':'100.0', 'sensor_tick':'0.05', 'vertical_fov':'30.0'}, display_pos=[1, 2])
 
 
         #Simulation loop
