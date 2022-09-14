@@ -107,9 +107,13 @@ class SensorManager:
         self.tics_processing = 0
 
         self.display_man.add_sensor(self)
+        self.sensor_type = None
+        self.color_format = carla.ColorConverter.Raw
 
     def init_sensor(self, sensor_type, transform, attached, sensor_options):
+        self.sensor_type = sensor_type
         if sensor_type == 'RGBCamera':
+            self.color_format = carla.ColorConverter.Raw
             camera_bp = self.world.get_blueprint_library().find('sensor.camera.rgb')
             disp_size = self.display_man.get_display_size()
             camera_bp.set_attribute('image_size_x', str(disp_size[0]))
@@ -120,6 +124,21 @@ class SensorManager:
 
             camera = self.world.spawn_actor(camera_bp, transform, attach_to=attached)
             camera.listen(self.save_rgb_image)
+
+            return camera
+
+        elif sensor_type == 'SemanticCamera':
+            self.color_format = carla.ColorConverter.CityScapesPalette
+            camera_bp = self.world.get_blueprint_library().find('sensor.camera.semantic_segmentation')
+            disp_size = self.display_man.get_display_size()
+            camera_bp.set_attribute('image_size_x', str(disp_size[0]))
+            camera_bp.set_attribute('image_size_y', str(disp_size[1]))
+
+            for key in sensor_options:
+                camera_bp.set_attribute(key, sensor_options[key])
+
+            camera = self.world.spawn_actor(camera_bp, transform, attach_to=attached)
+            camera.listen(self.save_semantic_image)
 
             return camera
 
@@ -172,6 +191,22 @@ class SensorManager:
         t_start = self.timer.time()
 
         image.convert(carla.ColorConverter.Raw)
+        array = np.frombuffer(image.raw_data, dtype=np.dtype("uint8"))
+        array = np.reshape(array, (image.height, image.width, 4))
+        array = array[:, :, :3]
+        array = array[:, :, ::-1]
+
+        if self.display_man.render_enabled():
+            self.surface = pygame.surfarray.make_surface(array.swapaxes(0, 1))
+
+        t_end = self.timer.time()
+        self.time_processing += (t_end-t_start)
+        self.tics_processing += 1
+
+    def save_semantic_image(self, image):
+        t_start = self.timer.time()
+
+        image.convert(carla.ColorConverter.CityScapesPalette)
         array = np.frombuffer(image.raw_data, dtype=np.dtype("uint8"))
         array = np.reshape(array, (image.height, image.width, 4))
         array = array[:, :, :3]
@@ -323,7 +358,7 @@ def run_simulation(args, client):
 
         # Then, SensorManager can be used to spawn RGBCamera, LiDARs and SemanticLiDARs as needed
         # and assign each of them to a grid position, 
-        SensorManager(world, display_manager, 'RGBCamera', carla.Transform(carla.Location(x=0, z=2.4), carla.Rotation(yaw=-90)), 
+        SensorManager(world, display_manager, 'SemanticCamera', carla.Transform(carla.Location(x=0, z=2.4), carla.Rotation(yaw=-90)), 
                       vehicle, {}, display_pos=[0, 0])
         SensorManager(world, display_manager, 'RGBCamera', carla.Transform(carla.Location(x=0, z=2.4), carla.Rotation(yaw=+00)), 
                       vehicle, {}, display_pos=[0, 1])

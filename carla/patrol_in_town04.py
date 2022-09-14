@@ -417,7 +417,7 @@ def game_loop(args):
                   "experience some issues with the traffic simulation")
 
         grid_size = [1, 1] # rows, cols, the lower-mid grid is always the god-view camera
-        if args.visualization == "radar":
+        if args.visualization == "radar" or args.visualization == "svc":
             grid_size = [3, 3]
         elif args.visualization == "lidar":
             grid_size = [2, 3]
@@ -533,8 +533,8 @@ def main():
         help='max throttle of vehicle, 1.0 means 160km/h, 0.4 means 15km/h, 0.2 means 5km/h (default: 0.35)')
     argparser.add_argument(
         '--visualization',
-        default='camera',
-        help='enable visualization, radar, lidar, camera or anything else, separately, not the same time')
+        default='svc',
+        help='enable visualization, radar, lidar, camera, svc or anything else, separately, not the same time')
 
     args = argparser.parse_args()
     args.width, args.height = [int(x) for x in args.res.split('x')]

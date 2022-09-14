@@ -213,6 +213,16 @@ class CameraWrapper(SensorWrapperBase):
             camera = self.world.spawn_actor(camera_bp, transform, attach_to=attached)
             camera.listen(self.save_rgb_image)
             return camera
+        elif sensor_type == "SemanticCamera":
+            camera_bp = self.world.get_blueprint_library().find('sensor.camera.semantic_segmentation')
+            disp_size = self.display_man.get_display_size()
+            for key in sensor_options:
+                camera_bp.set_attribute(key, sensor_options[key])
+            camera_bp.set_attribute('image_size_x', str(disp_size[0]))
+            camera_bp.set_attribute('image_size_y', str(disp_size[1]))
+            camera = self.world.spawn_actor(camera_bp, transform, attach_to=attached)
+            camera.listen(self.save_semantic_image)
+            return camera
         else:
             return None
 
@@ -220,6 +230,22 @@ class CameraWrapper(SensorWrapperBase):
         t_start = self.timer.time()
 
         image.convert(carla.ColorConverter.Raw)
+        array = np.frombuffer(image.raw_data, dtype=np.dtype("uint8"))
+        array = np.reshape(array, (image.height, image.width, 4))
+        array = array[:, :, :3]
+        array = array[:, :, ::-1]
+
+        if self.display_man.render_enabled():
+            self.surface = pygame.surfarray.make_surface(array.swapaxes(0, 1))
+
+        t_end = self.timer.time()
+        self.time_processing += (t_end-t_start)
+        self.tics_processing += 1
+
+    def save_semantic_image(self, image):
+        t_start = self.timer.time()
+
+        image.convert(carla.ColorConverter.CityScapesPalette)
         array = np.frombuffer(image.raw_data, dtype=np.dtype("uint8"))
         array = np.reshape(array, (image.height, image.width, 4))
         array = array[:, :, :3]
