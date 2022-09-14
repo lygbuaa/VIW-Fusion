@@ -142,7 +142,7 @@ class SceneWrapper(object):
         # Set up the sensors.
         self.collision_sensor = CollisionSensor(self.player, self.hud)
         self.lane_invasion_sensor = LaneInvasionSensor(self.player, self.hud)
-        self.gnss_sensor = GnssSensor(self.player)
+        self.gnss_sensor = GnssSensor(self.player, location=carla.Location(x=-1.42, y=0.0, z=0.33))
         self.imu_sensor = IMUSensor(self.player)
         actor_type = get_actor_display_name(self.player)
         self.hud.notification(actor_type)
