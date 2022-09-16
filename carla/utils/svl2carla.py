@@ -104,6 +104,11 @@ def LGSVL_2_Apollo(trans_lgsvl):
 
     return trans_apollo
 
+def quat_2_rot(qx=0.0, qy=0.0, qz=0.0, qw=1.0):
+    q = np.quaternion(qw, qx, qy, qz)
+    rot = quaternion.as_rotation_matrix(q)
+    print("q: {}, rot: {}".format(q, rot))
+    return rot
 
 # lgsvl using left-hand, +x: right (pitch), +y: up (yaw), +z: forward (roll)
 # input: transform:{x, y, z, pitch, yaw, roll}
@@ -134,4 +139,6 @@ if __name__ == "__main__":
     svl_radar_srr_rear_left = LGSVL_Transform(x=-1.0, y=0.3, z=-1.0, pitch=0.0, roll=0.0, yaw=-135.0)
     svl_radar_srr_rear_right = LGSVL_Transform(x=1.0, y=0.3, z=-1.0, pitch=0.0, roll=0.0, yaw=135.0)
 
-    LGSVL_2_Carla(svl_radar_srr_rear_right).show()
+    # LGSVL_2_Carla(svl_radar_srr_rear_right).show()
+
+    quat_2_rot(qx=-0.57922796534, qy=0.57922796534, qz=-0.405579787673, qw=0.405579787673)

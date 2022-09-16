@@ -1,11 +1,39 @@
-# run
+# debug topics
+/vins_estimator/camera_pose
+/vins_estimator/camera_pose_visual
+/vins_estimator/extrinsic
+/vins_estimator/groundtruth
+/vins_estimator/image_track
+/vins_estimator/imu_propagate
+/vins_estimator/key_poses
+/vins_estimator/keyframe_point
+/vins_estimator/keyframe_pose
+/vins_estimator/margin_cloud
+/vins_estimator/odometry
+/vins_estimator/path
+/vins_estimator/point_cloud
+/vins_estimator/pure_wheel_propagate
+/vins_estimator/wheel_preintegration
+/vins_estimator/wheel_propagate
+
+# control topics
+1. restart vins_estimator, `rostopic pub /vins_restart std_msgs/Bool true -1`
+2. enable/disable imu usage, `rostopic pub /vins_imu_switch std_msgs/Bool true -1` 
+3. enable/disable stereo usage, `rostopic pub /vins_cam_switch std_msgs/Bool true -1`
+
+# use carla data-bag
+1. `roslaunch vins vins_rviz.launch` # launch rviz
+2. `rosrun vins viwo_node config/carla/avp_town04_01.yaml` # launch viwo
+3. `rosbag play data/avp_town04_20220919.bag -r 0.1` # "-r 0.1" will slow-down publish rate by 0.1
+
+# run realsense_stereo_imu_config_ridgeback
 1. package name(defined in package.xml): vins, process name(defined in ridgeback_viwo.launch): viwo_node
 2. source devel/setup.bash
 3. `roslaunch vins ridgeback_viwo.launch` viwo_node will die, so run rviz and viwo_node seperately
 4. `roslaunch vins vins_rviz.launch &`
 5. `rosrun vins viwo_node config/realsense_d435i/realsense_stereo_imu_config_ridgeback.yaml &`
 6. `rosbag play data/ridgeback_dark.bag` can't play bag in the background
-7. debug topics published in visualization.cpp::registerPub(), as for "/vins_estimator/image_track", red-circle stands for good-tracking feature, blue-circle stands for bad-tracking feature, green-arrow stands for feature movement.
+7. debug topics published in visualization.cpp::registerPub(), as for "/vins_estimator/image_track", FeatureTracker::drawTrack() // red-circle stands for good-tracking feature, blue-circle stands for bad-tracking feature, green-arrow stands for feature movement.
 
 # get env ready
 1. docker pull ros:melodic
