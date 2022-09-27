@@ -112,6 +112,7 @@ class FeatureManager
     double compensatedParallax2(const FeaturePerId &it_per_id, int frame_count);
     const Matrix3d *Rs;
     Matrix3d ric[2];
+    long frame_cnt_ = 0;
 };
 
 #endif

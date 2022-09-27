@@ -12,6 +12,8 @@
 #include "../factor/pose_subset_parameterization.h"
 #include "../factor/orientation_subset_parameterization.h"
 
+#define BACKEND_OPT_USE_IMU true
+
 Estimator::Estimator(): f_manager{Rs}
 {
     ROS_INFO("init begins");
@@ -212,6 +214,7 @@ void Estimator::changeSensorType(int use_imu, int use_stereo)
 
 void Estimator::inputImage(double t, const cv::Mat &_img, const cv::Mat &_img1)
 {
+    HANG_STOPWATCH();
     inputImageCnt++;
     map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> featureFrame;
     TicToc featureTrackerTime;
@@ -297,11 +300,10 @@ void Estimator::inputFeature(double t, const vector<cv::Point2f>& _features0, co
 }
 void Estimator::inputGroundtruth(double t, Eigen::Matrix<double,7,1>& _data)
 {
-
-        mGTBuf.lock();
-        groundtruthBuf.push(make_pair(t, _data));
-        mGTBuf.unlock();
-
+    mGTBuf.lock();
+    groundtruthBuf.push(make_pair(t, _data));
+    ROS_INFO("inputGroundtruth, x: %f, y: %f, z: %f, qx: %f, qy: %f, qz: %f, qw: %f", _data[4], _data[5], _data[6], _data[1], _data[2], _data[3], _data[0]);
+    mGTBuf.unlock();
 }
 void Estimator::inputIMU(double t, const Vector3d &linearAcceleration, const Vector3d &angularVelocity)
 {
@@ -309,6 +311,7 @@ void Estimator::inputIMU(double t, const Vector3d &linearAcceleration, const Vec
     accBuf.push(make_pair(t, linearAcceleration));
     gyrBuf.push(make_pair(t, angularVelocity));
     //printf("input imu with time %f \n", t);
+    ROS_DEBUG("inputIMU, linearAcceleration: %f, %f, %f, angularVelocity: %f, %f, %f", linearAcceleration[0], linearAcceleration[1], linearAcceleration[2], angularVelocity[0], angularVelocity[1], angularVelocity[2]);
     mBuf.unlock();
 
     if (solver_flag == NON_LINEAR)
@@ -324,6 +327,7 @@ void Estimator::inputWheel(double t, const Vector3d &linearVelocity, const Vecto
     mWheelBuf.lock();
     wheelVelBuf.push(make_pair(t, linearVelocity));
     wheelGyrBuf.push(make_pair(t, angularVelocity));
+    ROS_DEBUG("inputWheel, linearVelocity: %f, %f, %f, angularVelocity: %f, %f, %f", linearVelocity[0], linearVelocity[1], linearVelocity[2], angularVelocity[0], angularVelocity[1], angularVelocity[2]);
     //printf("input imu with time %f \n", t);
     mWheelBuf.unlock();
 
@@ -574,13 +578,13 @@ void Estimator::initFirstIMUPose(vector<pair<double, Eigen::Vector3d>> &accVecto
         averAcc = averAcc + accVector[i].second;
     }
     averAcc = averAcc / n;
-    printf("averge acc %f %f %f\n", averAcc.x(), averAcc.y(), averAcc.z());
+    ROS_INFO("initFirstIMUPose, averge acc %f %f %f\n", averAcc.x(), averAcc.y(), averAcc.z());
     // 主要利用基于重力方向，得到的roll pitch信息，由于yaw信息通过重力方向，并不能恢复出来，因此减去yaw
     Matrix3d R0 = Utility::g2R(averAcc);
     double yaw = Utility::R2ypr(R0).x();
     R0 = Utility::ypr2R(Eigen::Vector3d{-yaw, 0, 0}) * R0;
     Rs[0] = R0;
-    cout << "init R0 " << endl << Rs[0] << endl;
+    ROS_DEBUG_STREAM("initFirstIMUPose, init R0 " << endl << Rs[0] << endl);
     //Vs[0] = Vector3d(5, 0, 0);
 }
 
@@ -689,8 +693,9 @@ void Estimator::integrateWheelPreintegration( double t, Eigen::Vector3d& P, Eige
 }
 void Estimator::processImage(const map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> &image, const double header)
 {
-    ROS_DEBUG("new image coming ------------------------------------------");
-    ROS_DEBUG("Adding feature points %lu", image.size());
+    HANG_STOPWATCH();
+    frame_cnt_ ++;
+    // ROS_DEBUG("new image coming ------------------------------------------");
     if (f_manager.addFeatureCheckParallax(frame_count, image, td))
     {
         marginalization_flag = MARGIN_OLD;
@@ -702,10 +707,12 @@ void Estimator::processImage(const map<int, vector<pair<int, Eigen::Matrix<doubl
         //printf("non-keyframe\n");
     }
 
-    ROS_DEBUG("%s", marginalization_flag ? "Non-keyframe" : "Keyframe");
-    ROS_INFO("%s", marginalization_flag ? "Non-keyframe" : "Keyframe");
-    ROS_DEBUG("Solving %d", frame_count);
-    ROS_DEBUG("number of feature: %d", f_manager.getFeatureCount());
+    // ROS_DEBUG("%s", marginalization_flag ? "Non-keyframe" : "Keyframe");
+    // ROS_INFO("%s", marginalization_flag ? "Non-keyframe" : "Keyframe");
+    // ROS_DEBUG("Solving %d", frame_count);
+    // ROS_DEBUG("number of feature in f_manager: %d", f_manager.getFeatureCount());
+    ROS_INFO("frame_cnt_: %ld, sliding_count: %d, exist feature: %d, incoming feature: %lu, marginalization_flag: %d", frame_cnt_, frame_count, f_manager.getFeatureCount(), image.size(), (int)marginalization_flag);
+
     Headers[frame_count] = header;
 
     ImageFrame imageframe(image, header);
@@ -1527,6 +1534,7 @@ void Estimator::optimization()
     }
     if(USE_IMU)
     {
+#if BACKEND_OPT_USE_IMU
         for (int i = 0; i < frame_count; i++)
         {
             int j = i + 1;
@@ -1542,6 +1550,7 @@ void Estimator::optimization()
 //            parameters[3] = para_SpeedBias[j];
 //            imu_factor->check(const_cast<double **>(parameters.data()));
         }
+#endif
     }
     if(USE_WHEEL && !ONLY_INITIAL_WITH_WHEEL)
     {
@@ -1582,14 +1591,16 @@ void Estimator::optimization()
         }
     }
 
-    int f_m_cnt = 0;
+    int f_pt_cnt = 0;
+    int f_res_cnt = 0;
     int feature_index = -1;
     for (auto &it_per_id : f_manager.feature)
     {
         it_per_id.used_num = it_per_id.feature_per_frame.size();
         if (it_per_id.used_num < 4)
             continue;
- 
+
+        f_pt_cnt++;
         ++feature_index;
 
         int imu_i = it_per_id.start_frame, imu_j = imu_i - 1;
@@ -1602,6 +1613,7 @@ void Estimator::optimization()
             //每个具有共视关系的帧都会形成因子
             if (imu_i != imu_j)
             {
+                f_res_cnt ++;
                 Vector3d pts_j = it_per_frame.point;
                 ProjectionTwoFrameOneCamFactor *f_td = new ProjectionTwoFrameOneCamFactor(pts_i, pts_j, it_per_id.feature_per_frame[0].velocity, it_per_frame.velocity,
                                                                  it_per_id.feature_per_frame[0].cur_td, it_per_frame.cur_td);
@@ -1633,11 +1645,10 @@ void Estimator::optimization()
                 }
                
             }
-            f_m_cnt++;
         }
     }
 
-    ROS_DEBUG("visual measurement count: %d", f_m_cnt);
+    // ROS_DEBUG("visual measurement count: %d", f_m_cnt);
     //printf("prepare for ceres: %f \n", t_prepare.toc());
 
     ceres::Solver::Options options;
@@ -1657,7 +1668,7 @@ void Estimator::optimization()
     ceres::Solver::Summary summary;
     ceres::Solve(options, &problem, &summary);
     //cout << summary.BriefReport() << endl;
-    ROS_DEBUG("Iterations : %d", static_cast<int>(summary.iterations.size()));
+    ROS_INFO("ceres::Solve iterations : %d, using feature point: %d, add residual total: %d", static_cast<int>(summary.iterations.size()), f_pt_cnt, f_res_cnt);
     //printf("solver costs: %f \n", t_solver.toc());
 
     double2vector();
@@ -1691,6 +1702,7 @@ void Estimator::optimization()
         //imu 预积分部分，基于第0帧与第1帧之间的预积分残差，边缘化第0帧状态向量
         if(USE_IMU)
         {
+#if BACKEND_OPT_USE_IMU
             if (pre_integrations[1]->sum_dt < 10.0)
             {
                 IMUFactor* imu_factor = new IMUFactor(pre_integrations[1]);
@@ -1699,6 +1711,7 @@ void Estimator::optimization()
                                                                            vector<int>{0, 1});//边缘化 para_Pose[0], para_SpeedBias[0]
                 marginalization_info->addResidualBlockInfo(residual_block_info);
             }
+#endif
         }
         //wheel 预积分部分，基于第0帧与第1帧之间的预积分残差，边缘化第0帧状态向量
         if(USE_WHEEL && !ONLY_INITIAL_WITH_WHEEL)
@@ -1843,14 +1856,14 @@ void Estimator::optimization()
             }
 
             TicToc t_pre_margin;
-            ROS_DEBUG("begin marginalization");
+            // ROS_DEBUG("begin marginalization");
             marginalization_info->preMarginalize();
-            ROS_DEBUG("end pre marginalization, %f ms", t_pre_margin.toc());
+            // ROS_DEBUG("end pre marginalization, %f ms", t_pre_margin.toc());
 
-            TicToc t_margin;
-            ROS_DEBUG("begin marginalization");
+            // TicToc t_margin;
+            // ROS_DEBUG("begin marginalization");
             marginalization_info->marginalize();
-            ROS_DEBUG("end marginalization, %f ms", t_margin.toc());
+            // ROS_DEBUG("end marginalization, %f ms", t_margin.toc());
             
             std::unordered_map<long, double *> addr_shift;
             for (int i = 0; i <= WINDOW_SIZE; i++)
@@ -2178,8 +2191,11 @@ void Estimator::outliersRejection(set<int> &removeIndex)
             }
         }
         double ave_err = err / errCnt;
-        if(ave_err * FOCAL_LENGTH > 3) // 若平均的重投影均方根过大，则判定该路标点为外点; 添加该路标点编号至removeIndex中
+        if(ave_err * FOCAL_LENGTH > 3){ 
+            // 若平均的重投影均方根过大，则判定该路标点为外点; 添加该路标点编号至removeIndex中
             removeIndex.insert(it_per_id.feature_id);
+            // ROS_INFO("feature_index %d is outlier, ave_err: %f", feature_index, ave_err);
+        }
 
     }
 }

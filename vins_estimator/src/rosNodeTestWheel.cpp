@@ -55,6 +55,27 @@ void wheel_callback(const nav_msgs::OdometryConstPtr &odom_msg)
     Vector3d vel(dx, dy, dz);
     Vector3d gyr(rx, ry, rz);
     estimator.inputWheel(t, vel, gyr);
+
+#if 1
+    static Eigen::Matrix<double,7,1> init_pose;
+    static bool init_done = false;
+    /* use wheel pose as groundtruth */
+    auto tmp_Q = odom_msg->pose.pose.orientation;
+    auto tmp_t = odom_msg->pose.pose.position;
+    Eigen::Matrix<double,7,1> data;
+    data << tmp_Q.w, tmp_Q.x, tmp_Q.y, tmp_Q.z, tmp_t.x, tmp_t.y, tmp_t.z;
+    if(!init_done){
+        init_pose = data;
+        init_done = true;
+    }else{
+        /* only correct translation initial pose */
+        data[4] -= init_pose[4];
+        data[5] -= init_pose[5];
+        data[6] -= init_pose[6];
+    }
+    estimator.inputGroundtruth(t, data);
+#endif
+
     return;
 }
 // 从msg中获取图片，返回值cv::Mat，输入是当前图像msg的指针

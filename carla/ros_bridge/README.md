@@ -8,3 +8,4 @@
 2. `roslaunch carla_spawn_parking carla_spawn_parking.launch`, create vehicle && sensors based on carla_spawn_parking/config/objects.json
 3. `rosrun rviz rviz`, enable visualization
 4. `roslaunch carla_manual_control carla_manual_control.launch`, control the vehicle, to set throttle limit: `self._control.throttle = 0.5 if keys[K_UP] or keys[K_w] else 0.0` in carla_manual_control/src/carla_manual_control/carla_manual_control.py
+5. `rosbag record -a` save all topic into rosbag file

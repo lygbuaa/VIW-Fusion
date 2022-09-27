@@ -11,7 +11,7 @@ num_of_cam: 1
 imu_topic: "/carla/ego_vehicle/imu"
 wheel_topic: "/carla/ego_vehicle/odometry" 
 #TODO check the distortion
-image0_topic: "/carla/ego_vehicle/semantic_svc_front/image"
+image0_topic: "/carla/ego_vehicle/camera_svc_front/image"
 # image1_topic: "/camera/infra2/image_rect_raw"
 output_path: "/home/hugoliu/github/catkin_ws/src/VIW-Fusion/output"
 

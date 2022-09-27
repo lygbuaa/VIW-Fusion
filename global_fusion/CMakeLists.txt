@@ -19,7 +19,8 @@ add_subdirectory(ThirdParty/GeographicLib)
 include_directories(
   ${catkin_INCLUDE_DIRS}
   ${CERES_INCLUDE_DIRS}
-        ThirdParty/GeographicLib/include
+  ThirdParty/GeographicLib/include
+  ${PROJECT_SOURCE_DIR}/../common/
 )
 
 

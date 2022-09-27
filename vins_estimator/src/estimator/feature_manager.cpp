@@ -51,8 +51,8 @@ int FeatureManager::getFeatureCount()
 
 bool FeatureManager::addFeatureCheckParallax(int frame_count, const map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> &image, double td)
 {
-    ROS_DEBUG("input feature: %d", (int)image.size());
-    ROS_DEBUG("num of feature: %d", getFeatureCount());
+    ROS_INFO("frame_cnt_: %ld, frame_count: %d, total feature: %d, good feature: %d, input feature: %d", frame_cnt_, frame_count, feature.size(), getFeatureCount(), (int)image.size());
+    // ROS_DEBUG("num of feature: %d", getFeatureCount());
     double parallax_sum = 0;
     int parallax_num = 0;
     last_track_num = 0;
@@ -75,6 +75,7 @@ bool FeatureManager::addFeatureCheckParallax(int frame_count, const map<int, vec
             return it.feature_id == feature_id;
                           });
 
+        /* push fresh new corner point into feature */
         if (it == feature.end())
         {
             feature.push_back(FeaturePerId(feature_id, frame_count));
@@ -90,10 +91,22 @@ bool FeatureManager::addFeatureCheckParallax(int frame_count, const map<int, vec
         }
     }
 
+    ROS_INFO("frame_cnt_: %ld, last_track_num: %d, new_feature_num: %d, long_track_num: %d, total feature: %d, good feature: %d", frame_cnt_, last_track_num, new_feature_num, long_track_num, feature.size(), getFeatureCount());
+    frame_cnt_ ++;
+
     //if (frame_count < 2 || last_track_num < 20)
     //if (frame_count < 2 || last_track_num < 20 || new_feature_num > 0.5 * last_track_num)
-    if (frame_count < 2 || last_track_num < 20 || long_track_num < 40 || new_feature_num > 0.5 * last_track_num)
+
+    /*  criterion of keyframe
+        1. the first frame, frame_count < 2
+        2. not enough tracked feature from last frame, last_track_num < 20
+        3. long_track_num < 40 is redundant with last_track_num < 20
+        4. considerable amount of new feature, new_feature_num > 0.5 * last_track_num
+    */
+    if (frame_count < 2 || last_track_num < 20 || long_track_num < 40 || new_feature_num > 0.5 * last_track_num){
+        ROS_INFO("keyframe criterion-1, tracking feature scarcity");
         return true;
+    }
 
     for (auto &it_per_id : feature)
     {
@@ -107,6 +120,7 @@ bool FeatureManager::addFeatureCheckParallax(int frame_count, const map<int, vec
 
     if (parallax_num == 0)
     {
+        ROS_INFO("keyframe criterion-2, parallax_num = 0");
         return true;
     }
     else
@@ -161,13 +175,17 @@ void FeatureManager::setDepth(const VectorXd &x)
 
 void FeatureManager::removeFailures()
 {
+    int failure_cnt = 0;
     for (auto it = feature.begin(), it_next = feature.begin();
          it != feature.end(); it = it_next)
     {
         it_next++;
-        if (it->solve_flag == 2)
+        if (it->solve_flag == 2){
             feature.erase(it);
+            failure_cnt ++;
+        }
     }
+    ROS_INFO("remove depth failure features: %d", failure_cnt);
 }
 
 void FeatureManager::clearDepth()
@@ -308,10 +326,15 @@ void FeatureManager::initFramePoseByPnP(int frameCnt, Vector3d Ps[], Matrix3d Rs
 
 void FeatureManager::triangulate(int frameCnt, Vector3d Ps[], Matrix3d Rs[], Vector3d tic[], Matrix3d ric[])
 {
+    int num_depth_exist = 0;
+    int num_covisible_cnt = 0;
+    int num_no_tracking_cnt = 0;
     for (auto &it_per_id : feature)
     {
-        if (it_per_id.estimated_depth > 0)
+        if (it_per_id.estimated_depth > 0){
+            num_depth_exist ++;
             continue;
+        }
 
         if(STEREO && it_per_id.feature_per_frame[0].is_stereo)
         {
@@ -352,8 +375,10 @@ void FeatureManager::triangulate(int frameCnt, Vector3d Ps[], Matrix3d Rs[], Vec
             */
             continue;
         }
+        /* corner point has co-visible frame, calc depth with triangulatePoint */
         else if(it_per_id.feature_per_frame.size() > 1)
         {
+            num_covisible_cnt ++;
             int imu_i = it_per_id.start_frame;
             Eigen::Matrix<double, 3, 4> leftPose;
             Eigen::Vector3d t0 = Ps[imu_i] + Rs[imu_i] * tic[0];
@@ -388,8 +413,12 @@ void FeatureManager::triangulate(int frameCnt, Vector3d Ps[], Matrix3d Rs[], Vec
             continue;
         }
         it_per_id.used_num = it_per_id.feature_per_frame.size();
-        if (it_per_id.used_num < 4)
+
+        /* if co-visible frame is less than 4, skipped */
+        if (it_per_id.used_num < 4){
+            num_no_tracking_cnt ++;
             continue;
+        }
 
         int imu_i = it_per_id.start_frame, imu_j = imu_i - 1;
 
@@ -435,6 +464,7 @@ void FeatureManager::triangulate(int frameCnt, Vector3d Ps[], Matrix3d Rs[], Vec
         }
 
     }
+    ROS_INFO("frame_cnt_: %ld, frameCnt: %d, total feature: %d, num_depth_exist: %d, num_covisible_cnt: %d, num_no_tracking_cnt: %d", frame_cnt_, frameCnt, feature.size(), num_depth_exist, num_covisible_cnt, num_no_tracking_cnt);
 }
 
 void FeatureManager::removeOutlier(set<int> &outlierIndex)
@@ -452,10 +482,12 @@ void FeatureManager::removeOutlier(set<int> &outlierIndex)
             //printf("remove outlier %d \n", index);
         }
     }
+    ROS_INFO("removed total outlier: %d", outlierIndex.size());
 }
 //移动特征点的主帧
 void FeatureManager::removeBackShiftDepth(Eigen::Matrix3d marg_R, Eigen::Vector3d marg_P, Eigen::Matrix3d new_R, Eigen::Vector3d new_P)
 {
+    int erased_feat = 0;
     for (auto it = feature.begin(), it_next = feature.begin();
          it != feature.end(); it = it_next)
     {
@@ -470,6 +502,7 @@ void FeatureManager::removeBackShiftDepth(Eigen::Matrix3d marg_R, Eigen::Vector3
             if (it->feature_per_frame.size() < 2)
             {
                 feature.erase(it);
+                erased_feat ++;
                 continue;
             }
             else // 该路标点被观测的次数满足要求，将深度信息在新的第0个图像帧中进行表示
@@ -492,6 +525,7 @@ void FeatureManager::removeBackShiftDepth(Eigen::Matrix3d marg_R, Eigen::Vector3
         }
         */
     }
+    ROS_INFO("total erased feature: %d", erased_feat);
 }
 
 void FeatureManager::removeBack()

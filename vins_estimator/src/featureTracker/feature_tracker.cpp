@@ -49,6 +49,7 @@ FeatureTracker::FeatureTracker()
 {
     stereo_cam = 0;
     n_id = 0;
+    frame_cnt_ = 0;
     hasPrediction = false;
 }
 // 把追踪到的点进行标记
@@ -114,16 +115,18 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
     */
     cur_pts.clear();
 
+    /* for MULTIPLE_THREAD, hasPrediction is disabled, so using pyramid*3 directly */
     if (prev_pts.size() > 0)
     {
         TicToc t_o;
         vector<uchar> status;
         vector<float> err;
+
         if(hasPrediction)
         {
             cur_pts = predict_pts;
             cv::calcOpticalFlowPyrLK(prev_img, cur_img, prev_pts, cur_pts, status, err, cv::Size(21, 21), 1,
-                    //迭代算法的终止条件
+            //迭代算法的终止条件
             cv::TermCriteria(cv::TermCriteria::COUNT+cv::TermCriteria::EPS, 30, 0.01), cv::OPTFLOW_USE_INITIAL_FLOW);
             
             int succ_num = 0;
@@ -132,11 +135,20 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
                 if (status[i])
                     succ_num++;
             }
-            if (succ_num < 10)//小于10时，使用金字塔进行搜索
+            //小于10时，使用金字塔进行搜索
+            if (succ_num < 10){
                cv::calcOpticalFlowPyrLK(prev_img, cur_img, prev_pts, cur_pts, status, err, cv::Size(21, 21), 3);
-        }
-        else
+            }
+        }else{
             cv::calcOpticalFlowPyrLK(prev_img, cur_img, prev_pts, cur_pts, status, err, cv::Size(21, 21), 3);
+            int succ_num = 0;
+            for (size_t i = 0; i < status.size(); i++)
+            {
+                if (status[i])
+                    succ_num++;
+            }
+            ROS_INFO("flow forward succ_num: %d", succ_num);
+        }
         // reverse check
         if(FLOW_BACK)
         {
@@ -145,18 +157,29 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
             cv::calcOpticalFlowPyrLK(cur_img, prev_img, cur_pts, reverse_pts, reverse_status, err, cv::Size(21, 21), 1, 
             cv::TermCriteria(cv::TermCriteria::COUNT+cv::TermCriteria::EPS, 30, 0.01), cv::OPTFLOW_USE_INITIAL_FLOW);
             //cv::calcOpticalFlowPyrLK(cur_img, prev_img, cur_pts, reverse_pts, reverse_status, err, cv::Size(21, 21), 3); 
+            int succ_num = 0;
+            for (size_t i = 0; i < reverse_status.size(); i++)
+            {
+                if (reverse_status[i])
+                    succ_num++;
+            }
+            ROS_INFO("flow backward succ_num: %d", succ_num);
+            succ_num = 0;
+
             for(size_t i = 0; i < status.size(); i++)
             {
                 //如果前后都能找到，并且找到的点的距离小于0.5
                 if(status[i] && reverse_status[i] && distance(prev_pts[i], reverse_pts[i]) <= 0.5)
                 {
                     status[i] = 1;
-                }
-                else
+                    succ_num ++;
+                }else{
                     status[i] = 0;
+                }
             }
+            ROS_INFO("final flow succ_num: %d", succ_num);
         }
-        
+
         for (int i = 0; i < int(cur_pts.size()); i++)
             if (status[i] && !inBorder(cur_pts[i]))// 如果这个点不在图像内，则剔除
                 status[i] = 0;
@@ -165,6 +188,9 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
         reduceVector(ids, status);
         reduceVector(track_cnt, status);
         ROS_DEBUG("temporal optical flow costs: %fms", t_o.toc());
+
+        int track_cnt_sum = std::accumulate(track_cnt.begin(), track_cnt.end(), 0);
+        ROS_INFO("frame_cnt_: %ld, prev_pts: %d, cur_pts: %d, ids: %d, track_cnt: %d, track_cnt_sum: %d, n_id: %d", frame_cnt_, prev_pts.size(), cur_pts.size(), ids.size(), track_cnt.size(), track_cnt_sum, n_id);
         //printf("track cnt %d\n", (int)ids.size());
     }
 
@@ -174,22 +200,23 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
     if (1)
     {
         //rejectWithF();
-        ROS_DEBUG("set mask begins");
+        // ROS_DEBUG("set mask begins");
         TicToc t_m;
         setMask();
         ROS_DEBUG("set mask costs %fms", t_m.toc());
 
-        ROS_DEBUG("detect feature begins");
+        // ROS_DEBUG("detect feature begins");
         TicToc t_t;
         // 如果当前图像的特征点cur_pts数目小于规定的最大特征点数目MAX_CNT，则进行提取
         int n_max_cnt = MAX_CNT - static_cast<int>(cur_pts.size());
         if (n_max_cnt > 0)
         {
             if(mask.empty())
-                cout << "mask is empty " << endl;
+                ROS_WARN("mask is empty");
             if (mask.type() != CV_8UC1)
-                cout << "mask type wrong " << endl;
-            cv::goodFeaturesToTrack(cur_img, n_pts, MAX_CNT - cur_pts.size(), 0.01, MIN_DIST, mask);
+                ROS_WARN("mask is empty");
+            cv::goodFeaturesToTrack(cur_img, n_pts, n_max_cnt, 0.01, MIN_DIST, mask);
+            ROS_INFO("not enough feature tracking, require more: %d, get: %d", n_max_cnt, n_pts.size());
         }
         else
             n_pts.clear();
@@ -271,6 +298,9 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
     if(SHOW_TRACK)
         drawTrack(cur_img, rightImg, ids, cur_pts, cur_right_pts, prevLeftPtsMap);
 
+    int track_cnt_sum = std::accumulate(track_cnt.begin(), track_cnt.end(), 0);
+    ROS_INFO("frame_cnt_: %ld, n_pts: %d, cur_pts: %d, ids: %d, track_cnt: %d, track_cnt_sum: %d, n_id: %d", frame_cnt_, n_pts.size(), cur_pts.size(), ids.size(), track_cnt.size(), track_cnt_sum, n_id);
+
     prev_img = cur_img;
     prev_pts = cur_pts;
     prev_un_pts = cur_un_pts;
@@ -325,7 +355,8 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
             featureFrame[feature_id].emplace_back(camera_id,  xyz_uv_velocity);
         }
     }
-
+    
+    frame_cnt_ ++;
     //printf("feature track whole time %f\n", t_r.toc());
     return featureFrame;
 }

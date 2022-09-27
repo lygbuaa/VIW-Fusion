@@ -1,3 +1,7 @@
+# ros log directory
+1. change ros log directory
+`export ROS_LOG_DIR=/home/hugoliu/github/catkin_ws/src/VIW-Fusion/.ros/log`
+
 # debug topics
 /vins_estimator/camera_pose
 /vins_estimator/camera_pose_visual

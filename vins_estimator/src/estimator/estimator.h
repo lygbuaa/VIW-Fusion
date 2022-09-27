@@ -38,7 +38,7 @@
 #include "../factor/projectionTwoFrameTwoCamFactor.h"
 #include "../factor/projectionOneFrameTwoCamFactor.h"
 #include "../featureTracker/feature_tracker.h"
-
+#include "viwo_utils.h"
 
 class Estimator
 {
@@ -169,7 +169,10 @@ class Estimator
     vector<Vector3d> linear_velocity_buf_wheel[(WINDOW_SIZE + 1)];
     vector<Vector3d> angular_velocity_buf_wheel[(WINDOW_SIZE + 1)];
 
+    /* frame count in the sliding window */
     int frame_count;
+    /* frame counter from startup */
+    long frame_cnt_ = -1;
     int sum_of_outlier, sum_of_back, sum_of_front, sum_of_invalid;
     int inputImageCnt;
 

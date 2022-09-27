@@ -34,7 +34,7 @@
                     "image_size_x": 800,
                     "image_size_y": 600,
                     "fov": 120.0,
-                    "sensor_tick": 0.033,
+                    "sensor_tick": 0.05,
                     "attached_objects":
                     [
                         {
@@ -50,8 +50,8 @@
                     "spawn_point": {"x": 2.58, "y": 0.0, "z": 0.73, "roll": 0.0, "pitch": 20.0, "yaw": 0.0},
                     "image_size_x": 1920,
                     "image_size_y": 1080,
-                    "fov": 120.0,
-                    "sensor_tick": 0.033
+                    "sensor_tick": 0.05,
+                    "fov": 120.0
                 },
 
                 {
@@ -60,8 +60,8 @@
                     "spawn_point": {"x": -2.62, "y": 0.0, "z": 0.73, "roll": 0.0, "pitch": 20.0, "yaw": 180.0},
                     "image_size_x": 1920,
                     "image_size_y": 1080,
-                    "fov": 120.0,
-                    "sensor_tick": 0.033
+                    "sensor_tick": 0.05,
+                    "fov": 120.0
                 },
 
                 {
@@ -70,8 +70,8 @@
                     "spawn_point": {"x": 0.08, "y": 1.1, "z": 0.73, "roll": 0.0, "pitch": 20.0, "yaw": 90.0},
                     "image_size_x": 1920,
                     "image_size_y": 1080,
-                    "fov": 120.0,
-                    "sensor_tick": 0.033
+                    "sensor_tick": 0.05,
+                    "fov": 120.0
                 },
 
                 {
@@ -80,8 +80,8 @@
                     "spawn_point": {"x": 0.08, "y": -1.1, "z": 0.73, "roll": 0.0, "pitch": 20.0, "yaw": -90.0},
                     "image_size_x": 1920,
                     "image_size_y": 1080,
-                    "fov": 120.0,
-                    "sensor_tick": 0.033
+                    "sensor_tick": 0.05,
+                    "fov": 120.0
                 },
 
                 {
@@ -94,10 +94,10 @@
                 {
                     "type": "sensor.other.imu",
                     "id": "imu",
-                    "spawn_point": {"x": 0.0, "y": 0.0, "z": 0.33, "roll": 0.0, "pitch": 0.0, "yaw": 0.0},
-                    "noise_accel_stddev_x": 0.0, "noise_accel_stddev_y": 0.0, "noise_accel_stddev_z": 0.0,
-                    "noise_gyro_stddev_x": 0.0, "noise_gyro_stddev_y": 0.0, "noise_gyro_stddev_z": 0.0,
-                    "noise_gyro_bias_x": 0.0, "noise_gyro_bias_y": 0.0, "noise_gyro_bias_z": 0.0
+                    "spawn_point": {"x": 0.0, "y": 0.0, "z": 0.0, "roll": 0.0, "pitch": 0.0, "yaw": 0.0},
+                    "noise_accel_stddev_x": 0.1, "noise_accel_stddev_y": 0.1, "noise_accel_stddev_z": 0.1,
+                    "noise_gyro_stddev_x": 0.05, "noise_gyro_stddev_y": 0.05, "noise_gyro_stddev_z": 0.05,
+                    "noise_gyro_bias_x": 0.00005, "noise_gyro_bias_y": 0.00005, "noise_gyro_bias_z": 0.00005
                 },
                 {
                     "type": "sensor.pseudo.tf",

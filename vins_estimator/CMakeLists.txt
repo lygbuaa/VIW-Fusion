@@ -23,7 +23,10 @@ message(WARNING "OpenCV_VERSION: ${OpenCV_VERSION}")
 
 find_package(Ceres REQUIRED)
 
-include_directories(${CERES_INCLUDE_DIRS})
+include_directories(
+  ${CERES_INCLUDE_DIRS}
+  ${PROJECT_SOURCE_DIR}/../common/
+  )
 #template sophus
 #set(Sophus_DIR "/home/td/slam/install/sophus/share/sophus/cmake/")
 find_package(Sophus REQUIRED)

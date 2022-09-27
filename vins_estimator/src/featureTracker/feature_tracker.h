@@ -13,6 +13,7 @@
 
 #include <cstdio>
 #include <iostream>
+#include <numeric>
 #include <queue>
 #include <execinfo.h>
 #include <csignal>
@@ -83,4 +84,5 @@ public:
     bool stereo_cam;
     int n_id;
     bool hasPrediction;
+    long frame_cnt_ = 0;
 };

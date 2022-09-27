@@ -145,8 +145,13 @@ void printStatistics(const Estimator &estimator, double t)
     if (estimator.solver_flag != Estimator::SolverFlag::NON_LINEAR)
         return;
     //printf("position: %f, %f, %f\r", estimator.Ps[WINDOW_SIZE].x(), estimator.Ps[WINDOW_SIZE].y(), estimator.Ps[WINDOW_SIZE].z());
-    ROS_DEBUG_STREAM("position: " << estimator.Ps[WINDOW_SIZE].transpose());
-    ROS_DEBUG_STREAM("orientation: " << estimator.Vs[WINDOW_SIZE].transpose());
+    // ROS_DEBUG_STREAM("position: " << estimator.Ps[WINDOW_SIZE].transpose());
+    // ROS_DEBUG_STREAM("orientation: " << estimator.Vs[WINDOW_SIZE].transpose());
+    Eigen::Vector3d pss = estimator.Ps[WINDOW_SIZE];
+    Eigen::Vector3d vss = estimator.Vs[WINDOW_SIZE];
+    Eigen::Vector3d ypr = Utility::R2ypr(estimator.Rs[WINDOW_SIZE]);
+    ROS_INFO("estimator states, Ps: %f, %f, %f, Vs: %f, %f, %f, ypr(deg): %f, %f, %f", pss[0], pss[1], pss[2], vss[0], vss[1], vss[2], ypr[0], ypr[1], ypr[2]);
+
     if (ESTIMATE_EXTRINSIC || ESTIMATE_EXTRINSIC_WHEEL || USE_PLANE)
     {
         cv::FileStorage fs(EX_CALIB_RESULT_PATH, cv::FileStorage::WRITE);
@@ -183,8 +188,8 @@ void printStatistics(const Estimator &estimator, double t)
         }
 
         if(USE_PLANE){
-            ROS_DEBUG_STREAM("plane zpw: " << estimator.zpw);
-            ROS_DEBUG_STREAM("plane rpw: " << Utility::R2ypr(estimator.rpw).transpose());
+            ROS_DEBUG_STREAM("plane zpw height: " << estimator.zpw);
+            ROS_DEBUG_STREAM("plane rpw to yaw-pitch-roll(deg): " << Utility::R2ypr(estimator.rpw).transpose());
 
             Eigen::Matrix3d eigen_T = estimator.rpw;
             cv::Mat cv_T;
@@ -514,7 +519,7 @@ void pubPointCloud(const Estimator &estimator, const std_msgs::Header &header)
         p.z = w_pts_i(2);
         point_cloud.points.push_back(p);
     }
-    ROS_INFO("good point size: %d", point_cloud.points.size());
+    ROS_INFO("point_cloud size: %d", point_cloud.points.size());
     pub_point_cloud.publish(point_cloud);
 
 
