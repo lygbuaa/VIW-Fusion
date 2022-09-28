@@ -3,6 +3,7 @@
 
 #include <chrono>
 #include <memory>
+#include <cstdlib>
 #include <ros/ros.h>
 
 
@@ -31,6 +32,17 @@ public:
             ROS_INFO("stop watch end by %s (elapse = %ld us)", func_name, (ts_us - *ptr));
             delete ptr;
         });
+    }
+
+    /* between 0~k */
+    static double RandDouble(double k = 1.0f){
+        return k * rand() / double(RAND_MAX);
+    }
+
+    /* unit: m/s */
+    static double WheelVelBias(double k = 0.01f){
+        /* this noise should keep positive or negative */
+        return fabs(RandDouble(k));
     }
 
 };

@@ -1,3 +1,8 @@
+# run viwo with loop fusion
+1. `roslaunch vins avp_carla.launch`
+2. `rosbag play data/avp_town04_20220927.bag` 
+3. in the end, press keyboard `s` and `enter` to save trajectory and graph.
+
 # ros log directory
 1. change ros log directory
 `export ROS_LOG_DIR=/home/hugoliu/github/catkin_ws/src/VIW-Fusion/.ros/log`

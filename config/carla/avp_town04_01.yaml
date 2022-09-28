@@ -15,7 +15,7 @@ image0_topic: "/carla/ego_vehicle/camera_svc_front/image"
 # image1_topic: "/camera/infra2/image_rect_raw"
 output_path: "/home/hugoliu/github/catkin_ws/src/VIW-Fusion/output"
 
-cam0_calib: "camera_info_svc_front.yaml"
+cam0_calib: "camera_info_svc_front.yaml"  #/home/hugoliu/github/catkin_ws/src/VIW-Fusion/config/carla/
 # cam1_calib: "camera_info_svc_front.yaml"
 image_width: 1920
 image_height: 1080
@@ -109,9 +109,9 @@ g_norm: 9.805         # gravity magnitude
 
 #wheel parameters
 # rad/s mono:0.004 stereo:0.002
-wheel_gyro_noise_sigma: 0.004
+wheel_gyro_noise_sigma: 0.01
 #　m/s mono:0.01  stereo:0.006
-wheel_velocity_noise_sigma: 0.01
+wheel_velocity_noise_sigma: 0.05
 
 estimate_wheel_intrinsic: 0
 # 0  Have an accurate intrinsic parameters. We will trust the following sx, sy, sw, don't change it.

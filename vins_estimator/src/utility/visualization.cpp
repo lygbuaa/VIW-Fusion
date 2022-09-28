@@ -13,7 +13,7 @@ using namespace ros;
 using namespace Eigen;
 ros::Publisher pub_odometry, pub_latest_odometry, pub_latest_wheel_odometry, pub_latest_pure_wheel_odometry;
 ros::Publisher pub_path;
-ros::Publisher pub_groundtruth;
+ros::Publisher pub_groundtruth, pub_latest_pure_wheel_path;
 ros::Publisher pub_wheel_preintegration;
 ros::Publisher pub_point_cloud, pub_margin_cloud;
 ros::Publisher pub_key_poses;
@@ -21,6 +21,7 @@ ros::Publisher pub_camera_pose;
 ros::Publisher pub_camera_pose_visual;
 nav_msgs::Path path;
 nav_msgs::Path groundtruth_path;
+nav_msgs::Path pure_wheel_path;
 
 ros::Publisher pub_keyframe_pose;
 ros::Publisher pub_keyframe_point;
@@ -38,7 +39,8 @@ void registerPub(ros::NodeHandle &n)
 {
     pub_latest_odometry = n.advertise<nav_msgs::Odometry>("imu_propagate", 1000);
     pub_latest_wheel_odometry = n.advertise<nav_msgs::Odometry>("wheel_propagate", 1000);
-    pub_latest_pure_wheel_odometry = n.advertise<nav_msgs::Odometry>("pure_wheel_propagate", 1000);
+    // pub_latest_pure_wheel_odometry = n.advertise<nav_msgs::Odometry>("pure_wheel_propagate", 1000);
+    pub_latest_pure_wheel_path = n.advertise<nav_msgs::Path>("pure_wheel_propagate", 1000);
     pub_path = n.advertise<nav_msgs::Path>("path", 1000);
     pub_groundtruth = n.advertise<nav_msgs::Path>("groundtruth", 1000);
     pub_wheel_preintegration = n.advertise<nav_msgs::Path>("wheel_preintegration", 1000);
@@ -106,7 +108,17 @@ void pubPureWheelLatestOdometry(const Eigen::Vector3d &P, const Eigen::Quaternio
     odometry.twist.twist.linear.x = V.x();
     odometry.twist.twist.linear.y = V.y();
     odometry.twist.twist.linear.z = V.z();
-    pub_latest_pure_wheel_odometry.publish(odometry);
+    // pub_latest_pure_wheel_odometry.publish(odometry);
+
+    geometry_msgs::PoseStamped pose_stamped;
+    pose_stamped.header = odometry.header;
+    pose_stamped.header.frame_id = "world";
+    pose_stamped.pose = odometry.pose.pose;
+
+    pure_wheel_path.header = odometry.header;
+    /* path is a trajectory, shouble be global */
+    pure_wheel_path.poses.push_back(pose_stamped);
+    pub_latest_pure_wheel_path.publish(pure_wheel_path);
 }
 void pubTrackImage(const cv::Mat &imgTrack, const double t)
 {
@@ -421,8 +433,6 @@ void pubWheelPreintegration(const Eigen::Vector3d& P, const Eigen::Quaterniond& 
     preintegration_path.header.frame_id = "world";
     preintegration_path.poses.push_back(pose_stamped);
     pub_wheel_preintegration.publish(preintegration_path);
-
-
 }
 void pubKeyPoses(const Estimator &estimator, const std_msgs::Header &header)
 {

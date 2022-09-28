@@ -23,6 +23,7 @@
 #include "parameters.h"
 #include "ThirdParty/DBoW/DBoW2.h"
 #include "ThirdParty/DVision/DVision.h"
+#include "viwo_utils.h"
 
 #define MIN_LOOP_NUM 25
 

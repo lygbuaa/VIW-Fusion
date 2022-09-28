@@ -361,10 +361,11 @@ void process()
                 }
 
                 KeyFrame* keyframe = new KeyFrame(pose_msg->header.stamp.toSec(), frame_index, T, R, image,
-                                   point_3d, point_2d_uv, point_2d_normal, point_id, sequence);   
+                                   point_3d, point_2d_uv, point_2d_normal, point_id, sequence);
                 m_process.lock();
                 start_flag = 1;
                 posegraph.addKeyFrame(keyframe, 1);
+                ROS_INFO("addKeyFrame: %d", frame_index);
                 m_process.unlock();
                 frame_index++;
                 last_t = T;
@@ -384,9 +385,10 @@ void command()
         {
             m_process.lock();
             posegraph.savePoseGraph();
+            posegraph.saveFinalPath();
             m_process.unlock();
-            printf("save pose graph finish\nyou can set 'load_previous_pose_graph' to 1 in the config file to reuse it next time\n");
-            printf("program shutting down...\n");
+            ROS_INFO("save pose graph finish\nyou can set 'load_previous_pose_graph' to 1 in the config file to reuse it next time\n");
+            ROS_INFO("program shutting down...\n");
             ros::shutdown();
         }
         if (c == 'n')

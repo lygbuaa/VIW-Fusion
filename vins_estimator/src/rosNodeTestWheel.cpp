@@ -46,12 +46,12 @@ void img1_callback(const sensor_msgs::ImageConstPtr &img_msg)
 void wheel_callback(const nav_msgs::OdometryConstPtr &odom_msg)
 {
     double t = odom_msg->header.stamp.toSec();
-    double dx = odom_msg->twist.twist.linear.x;
-    double dy = odom_msg->twist.twist.linear.y;
+    double dx = odom_msg->twist.twist.linear.x + ViwoUtils::WheelVelBias(VEL_N_wheel);
+    double dy = odom_msg->twist.twist.linear.y + ViwoUtils::WheelVelBias(VEL_N_wheel);
     double dz = odom_msg->twist.twist.linear.z;
     double rx = odom_msg->twist.twist.angular.x;
     double ry = odom_msg->twist.twist.angular.y;
-    double rz = odom_msg->twist.twist.angular.z;
+    double rz = odom_msg->twist.twist.angular.z + ViwoUtils::WheelVelBias(GYR_N_wheel);
     Vector3d vel(dx, dy, dz);
     Vector3d gyr(rx, ry, rz);
     estimator.inputWheel(t, vel, gyr);

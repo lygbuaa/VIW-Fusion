@@ -85,7 +85,9 @@ KeyFrame::KeyFrame(double _time_stamp, int _index, Vector3d &_vio_T_w_i, Matrix3
 
 void KeyFrame::computeWindowBRIEFPoint()
 {
+	HANG_STOPWATCH();
 	BriefExtractor extractor(BRIEF_PATTERN_FILE.c_str());
+	ROS_INFO("computeWindowBRIEFPoint for corner points: %d", point_2d_uv.size());
 	for(int i = 0; i < (int)point_2d_uv.size(); i++)
 	{
 	    cv::KeyPoint key;
@@ -97,6 +99,7 @@ void KeyFrame::computeWindowBRIEFPoint()
 
 void KeyFrame::computeBRIEFPoint()
 {
+	HANG_STOPWATCH();
 	BriefExtractor extractor(BRIEF_PATTERN_FILE.c_str());
 	const int fast_th = 20; // corner detector response threshold
 	if(1)
@@ -112,6 +115,7 @@ void KeyFrame::computeBRIEFPoint()
 		    keypoints.push_back(key);
 		}
 	}
+	ROS_INFO("cv::FAST detect %d corner with threshold %d", keypoints.size(), fast_th);
 	extractor(image, keypoints, brief_descriptors);
 	for (int i = 0; i < (int)keypoints.size(); i++)
 	{
@@ -269,6 +273,7 @@ void KeyFrame::PnPRANSAC(const vector<cv::Point2f> &matched_2d_old_norm,
 
 bool KeyFrame::findConnection(KeyFrame* old_kf)
 {
+	HANG_STOPWATCH();
 	TicToc tmp_t;
 	//printf("find Connection\n");
 	vector<cv::Point2f> matched_2d_cur, matched_2d_old;

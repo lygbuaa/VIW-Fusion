@@ -31,7 +31,10 @@ PoseGraph::PoseGraph()
 
 PoseGraph::~PoseGraph()
 {
-    t_optimization.detach();
+    /* warn: should call t_optimization.join() */
+    // t_optimization.detach();
+    optimize_exit_flag_ = true;
+    t_optimization.join();
 }
 
 void PoseGraph::registerPub(ros::NodeHandle &n)
@@ -67,6 +70,7 @@ void PoseGraph::loadVocabulary(std::string voc_path)
 
 void PoseGraph::addKeyFrame(KeyFrame* cur_kf, bool flag_detect_loop)
 {
+    HANG_STOPWATCH();
     //shift to base frame
     Vector3d vio_P_cur;
     Matrix3d vio_R_cur;
@@ -179,6 +183,8 @@ void PoseGraph::addKeyFrame(KeyFrame* cur_kf, bool flag_detect_loop)
     path[sequence_cnt].poses.push_back(pose_stamped);
     path[sequence_cnt].header = pose_stamped.header;
 
+#if 0
+    /* this is not fully optimized path */
     if (SAVE_LOOP_PATH)
     {
         ofstream loop_path_file(VINS_RESULT_PATH, ios::app);
@@ -208,7 +214,9 @@ void PoseGraph::addKeyFrame(KeyFrame* cur_kf, bool flag_detect_loop)
               << Q.w() << endl;
 
         loop_path_file.close();
+        ROS_INFO("output %s: %f", VINS_RESULT_PATH.c_str(), cur_kf->time_stamp * 1e9);
     }
+#endif
     //draw local connection
     if (SHOW_S_EDGE)
     {
@@ -347,6 +355,7 @@ KeyFrame* PoseGraph::getKeyFrame(int index)
 
 int PoseGraph::detectLoop(KeyFrame* keyframe, int frame_index)
 {
+    HANG_STOPWATCH();
     // put image into image_pool; for visualization
     cv::Mat compressed_image;
     if (DEBUG_IMAGE)
@@ -422,6 +431,7 @@ int PoseGraph::detectLoop(KeyFrame* keyframe, int frame_index)
             if (min_index == -1 || (ret[i].Id < min_index && ret[i].Score > 0.015))
                 min_index = ret[i].Id;
         }
+        ROS_INFO("find loop, min_index: %d", min_index);
         return min_index;
     }
     else
@@ -446,11 +456,13 @@ void PoseGraph::addKeyFrameIntoVoc(KeyFrame* keyframe)
 
 void PoseGraph::optimize4DoF()
 {
-    while(true)
+    while(!optimize_exit_flag_)
     {
         int cur_index = -1;
         int first_looped_index = -1;
         m_optimize_buf.lock();
+
+        /* t_optimization thread only use the latest keyframe, elder keyframe will deprecated. */
         while(!optimize_buf.empty())
         {
             cur_index = optimize_buf.front();
@@ -460,7 +472,8 @@ void PoseGraph::optimize4DoF()
         m_optimize_buf.unlock();
         if (cur_index != -1)
         {
-            printf("optimize pose graph \n");
+            HANG_STOPWATCH();
+            // printf("optimize pose graph \n");
             TicToc tmp_t;
             m_keyframelist.lock();
             KeyFrame* cur_kf = getKeyFrame(cur_index);
@@ -617,16 +630,17 @@ void PoseGraph::optimize4DoF()
             updatePath();
         }
 
-        std::chrono::milliseconds dura(2000);
+        std::chrono::milliseconds dura(200);
         std::this_thread::sleep_for(dura);
     }
+    ROS_INFO("optimize4DoF exit");
     return;
 }
 
 
 void PoseGraph::optimize6DoF()
 {
-    while(true)
+    while(!optimize_exit_flag_)
     {
         int cur_index = -1;
         int first_looped_index = -1;
@@ -789,11 +803,13 @@ void PoseGraph::optimize6DoF()
         std::chrono::milliseconds dura(2000);
         std::this_thread::sleep_for(dura);
     }
+    ROS_INFO("optimize6DoF exit");
     return;
 }
 
 void PoseGraph::updatePath()
 {
+    HANG_STOPWATCH();
     m_keyframelist.lock();
     list<KeyFrame*>::iterator it;
     for (int i = 1; i <= sequence_cnt; i++)
@@ -803,11 +819,11 @@ void PoseGraph::updatePath()
     base_path.poses.clear();
     posegraph_visualization->reset();
 
-    if (SAVE_LOOP_PATH)
-    {
-        ofstream loop_path_file_tmp(VINS_RESULT_PATH, ios::out);
-        loop_path_file_tmp.close();
-    }
+    // if (SAVE_LOOP_PATH)
+    // {
+    //     ofstream loop_path_file_tmp(VINS_RESULT_PATH, ios::out);
+    //     loop_path_file_tmp.close();
+    // }
 
     for (it = keyframelist.begin(); it != keyframelist.end(); it++)
     {
@@ -839,6 +855,8 @@ void PoseGraph::updatePath()
             path[(*it)->sequence].header = pose_stamped.header;
         }
 
+#if 0
+        /* this is optimized path, but not complete untill SLAM end */
         if (SAVE_LOOP_PATH)
         {
             ofstream loop_path_file(VINS_RESULT_PATH, ios::app);
@@ -868,6 +886,7 @@ void PoseGraph::updatePath()
                             << Q.w() << endl;
             loop_path_file.close();
         }
+#endif
         //draw local connection
         if (SHOW_S_EDGE)
         {
@@ -915,6 +934,7 @@ void PoseGraph::updatePath()
         }
 
     }
+    // ROS_INFO(" updatePath saved %d pose to %s", keyframelist.size(), VINS_RESULT_PATH.c_str());
     publish();
     m_keyframelist.unlock();
 }
@@ -1109,4 +1129,39 @@ void PoseGraph::publish()
     }
     pub_base_path.publish(base_path);
     //posegraph_visualization->publish_by(pub_pose_graph, path[sequence_cnt].header);
+}
+
+void PoseGraph::saveFinalPath()
+{
+    HANG_STOPWATCH();
+    m_keyframelist.lock();
+    list<KeyFrame*>::iterator it;
+    ofstream loop_path_file(VINS_RESULT_PATH, ios::app);
+
+    for (it = keyframelist.begin(); it != keyframelist.end(); it++)
+    {
+        Vector3d P;
+        Matrix3d R;
+        (*it)->getPose(P, R);
+        Quaterniond Q;
+        Q = R;
+        /* this is optimized path, but not complete untill SLAM end */
+        if (SAVE_LOOP_PATH)
+        {
+            loop_path_file.setf(ios::fixed, ios::floatfield);
+            loop_path_file.precision(0);
+            loop_path_file << (*it)->time_stamp * 1e9 << " ";
+            loop_path_file.precision(9);
+            loop_path_file  << P.x() << " "
+                            << P.y() << " "
+                            << P.z() << " "
+                            << Q.x() << " "
+                            << Q.y() << " "
+                            << Q.z() << " "
+                            << Q.w() << endl;
+        }
+    }
+    ROS_INFO(" saveFinalPath saved %d pose to %s", keyframelist.size(), VINS_RESULT_PATH.c_str());
+    loop_path_file.close();
+    m_keyframelist.unlock();
 }

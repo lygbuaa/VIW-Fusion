@@ -53,6 +53,7 @@ public:
 	void loadKeyFrame(KeyFrame* cur_kf, bool flag_detect_loop);
 	void loadVocabulary(std::string voc_path);
 	void setIMUFlag(bool _use_imu);
+	void saveFinalPath();
 	KeyFrame* getKeyFrame(int index);
 	nav_msgs::Path path[10];
 	nav_msgs::Path base_path;
@@ -67,8 +68,8 @@ public:
 	Vector3d w_t_vio;
 	Matrix3d w_r_vio;
 
-
 private:
+	volatile bool optimize_exit_flag_ = false;
 	int detectLoop(KeyFrame* keyframe, int frame_index);
 	void addKeyFrameIntoVoc(KeyFrame* keyframe);
 	void optimize4DoF();
