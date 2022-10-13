@@ -21,10 +21,10 @@ class CarlaIPM(object):
         # bev image params
         self.H_BEV_PIXEL = 960
         self.W_BEV_PIXEL = 1280
-        self.XMAX_BODY_M = 48
-        # self.YMAX_BODY_M = 32*2
+        self.XMAX_BODY_M = 24
+        self.YMAX_BODY_M = self.XMAX_BODY_M*self.W_BEV_PIXEL/self.H_BEV_PIXEL
 
-        # rotation matrix from camera to body, could not be ignored
+        # rotation matrix from camera to body, should never ignored
         self.R0_CAM_TO_BODY = np.array([
             [0.0, 0.0, 1.0],
             [1.0, 0.0, 0.0],
@@ -37,43 +37,21 @@ class CarlaIPM(object):
         # self.calc_ipm_demo()
         self.calc_ipm()
 
-    # https://answers.opencv.org/question/174548/inverse-perspective-mapping-ipm-on-the-capture-from-camera-feed/
-    def calc_ipm_demo(self):
-        K_cam = self.K_svc_cam
-        T = np.array([
-            [0.0],
-            [0.0],
-            [100.0]
-        ], dtype=np.float32)
-        R = self.rot_mat_from_euler(pitch=0.0, roll=-70.0, yaw=0.0)
-        RT = np.concatenate((np.concatenate((R, T), axis=1), np.array([[0, 0, 0, 1]])), axis=0)
-
-        K_bev = np.array([
-            [1.0, 0.0, -960, 0.0],
-            [0.0, 1.0, -540, 0.0],
-            [0.0, 0.0, 0.0,  0.0],
-            [0.0, 0.0, 1.0,  1.0]
-        ], dtype=np.float32)
-        self.H_bev_to_svc = (K_cam @ (RT @ K_bev))[0:3, 0:3]
-        self.H_svc_to_bev = np.linalg.inv(self.H_bev_to_svc)
-        print("H_bev_to_svc: {}, \n H_svc_to_bev: {}".format(self.H_bev_to_svc, self.H_svc_to_bev))
-
     def calc_ipm(self):
-        # to be confirmed
-        # self.inv_K_bev_cam[2, 2] = 0.0
-        # self.inv_K_bev_cam[3, 2] = 1.0
-        # self.inv_K_bev_cam[3, 1] = 1.0
-        # self.inv_K_bev_cam[3, 0] = 1.0
-        self.H_bev_to_svc = (self.K_svc_cam @ (self.Ess_svc_body_to_cam @ (self.Ess_bev_cam_to_body @ self.inv_K_bev_cam)))[0:3, 0:3]
+        # inv_K_bev_cam_43[3, 2]=1 is the key-point for translation
+        inv_K_bev_cam_43 = np.concatenate([self.inv_K_bev_cam, np.array([[0, 0, 1]])], axis=0)
+        K_svc_cam_34 = np.concatenate([self.K_svc_cam, np.array([[0], [0], [0]])], axis=1)
+        print("inv_K_bev_cam_43: {}, \n K_svc_cam_34: {}".format(inv_K_bev_cam_43, K_svc_cam_34))
+
+        self.H_bev_to_svc = (K_svc_cam_34 @ (self.Ess_svc_body_to_cam @ (self.Ess_bev_cam_to_body @ inv_K_bev_cam_43)))
         self.H_svc_to_bev = np.linalg.inv(self.H_bev_to_svc)
         print("H_bev_to_svc: {}, \n H_svc_to_bev: {}".format(self.H_bev_to_svc, self.H_svc_to_bev))
 
     def init_svc_camera_params(self, orientation=0.0):
         self.K_svc_cam = np.array([
-            [554.256, 0.0, 960.0, 0.0],
-            [0.0, 554.256, 540.0, 0.0],
-            [0.0,     0.0,   1.0, 0.0],
-            [0.0,     0.0,   0.0, 1.0]
+            [554.256, 0.0, 960.0],
+            [0.0, 554.256, 540.0],
+            [0.0,     0.0,   1.0]
         ], dtype=np.float32)
         self.inv_K_svc_cam = np.linalg.inv(self.K_svc_cam)
         print("K_svc_cam: {}, \n inv_K_svc_cam: {}".format(self.K_svc_cam, self.inv_K_svc_cam))
@@ -88,10 +66,9 @@ class CarlaIPM(object):
         self.f_bev_cam = self.Z0_BEV * self.H_BEV_PIXEL / self.XMAX_BODY_M
         print("f_bev_cam: {}".format(self.f_bev_cam))
         self.K_bev_cam = np.array([
-            [self.f_bev_cam, 0.0, self.W_BEV_PIXEL/2.0, 0.0],
-            [0.0, self.f_bev_cam, self.H_BEV_PIXEL/2.0, 0.0],
-            [0.0,     0.0,                   1.0,       0.0],
-            [0.0,     0.0,                   0.0,       1.0]
+            [self.f_bev_cam, 0.0, self.W_BEV_PIXEL/2.0],
+            [0.0, self.f_bev_cam, self.H_BEV_PIXEL/2.0],
+            [0.0,     0.0,                         1.0]
         ], dtype=np.float32)
         # intrinsic normalization
         self.K_bev_cam[0:3, 0:3] = self.K_bev_cam[0:3, 0:3]/self.Z0_BEV
@@ -99,7 +76,7 @@ class CarlaIPM(object):
         print("K_bev_cam: {}, \n inv_K_bev_cam: {}".format(self.K_bev_cam, self.inv_K_bev_cam))
         # from camera to body, pitch(+Y, right) is 90
         self.R_bev_cam_to_body = self.rot_mat_from_euler(pitch=90.0, roll=0.0, yaw=0.0) @ self.R0_CAM_TO_BODY
-        # T make no difference to homography at all, needs debug
+        # set virtual camera in the center of BEV
         self.T_bev_cam_to_body = np.array([
             [self.X0_SVC+self.XMAX_BODY_M/2],
             [self.Y0_SVC],
@@ -129,6 +106,27 @@ class CarlaIPM(object):
     def rot_mat_from_quat(self, q):
         return quaternion.as_rotation_matrix(q)
 
+    # https://answers.opencv.org/question/174548/inverse-perspective-mapping-ipm-on-the-capture-from-camera-feed/
+    def calc_ipm_demo(self):
+        K_cam = self.K_svc_cam
+        T = np.array([
+            [0.0],
+            [0.0],
+            [100.0]
+        ], dtype=np.float32)
+        R = self.rot_mat_from_euler(pitch=0.0, roll=-70.0, yaw=0.0)
+        RT = np.concatenate((np.concatenate((R, T), axis=1), np.array([[0, 0, 0, 1]])), axis=0)
+
+        K_bev = np.array([
+            [1.0, 0.0, -960, 0.0],
+            [0.0, 1.0, -540, 0.0],
+            [0.0, 0.0, 0.0,  0.0],
+            [0.0, 0.0, 1.0,  1.0]
+        ], dtype=np.float32)
+        self.H_bev_to_svc = (K_cam @ (RT @ K_bev))[0:3, 0:3]
+        self.H_svc_to_bev = np.linalg.inv(self.H_bev_to_svc)
+        print("H_bev_to_svc: {}, \n H_svc_to_bev: {}".format(self.H_bev_to_svc, self.H_svc_to_bev))
+
     def valid_H(self):
         # H_bev_to_svc = np.array([
         #     [ 7.12538216e+01,  0.00000000e+00, -2.34211150e+04],
@@ -152,12 +150,11 @@ class CarlaIPM(object):
         #     [ 1.0,  0.0, 0.0],
         #     [ 0.0,  0.0, 1.0]
         # ], dtype=np.float32)
-        img_dst = cv2.warpPerspective(img_src, H, (int(self.W_BEV_PIXEL), int(self.H_BEV_PIXEL/2)))
+        img_dst = cv2.warpPerspective(img_src, H, (int(self.W_BEV_PIXEL), int(self.H_BEV_PIXEL)))
         cv2.imwrite(image_path + ".ipm.jpg", img_dst)
         cv2.namedWindow("ipm", cv2.WINDOW_NORMAL)
         cv2.imshow("ipm", img_dst)
         cv2.waitKey(-1)
-
 
 if __name__ == "__main__":
     ipm = CarlaIPM()
