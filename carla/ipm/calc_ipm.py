@@ -12,19 +12,31 @@ import quaternion
 # X-forward, Y-right, Z-up,  euler angles in right-hand, pitch: +Y, roll: +X, yaw: -Z.
 class CarlaIPM(object):
     def __init__(self):
-        # camera original point in body-frame, in meter
+        # svc-camera extrinsic in body-frame, in meter & degree
         self.X0_SVC = 2.58
         self.Y0_SVC = 0.0
         self.Z0_SVC = 0.73
-        # hight of virtual-bev-camera in body-frame, could be same as svc-camera
-        self.Z0_BEV = self.Z0_SVC
-        # bev image params
-        self.H_BEV_PIXEL = 960
+        self.PITCH_SVC = 20.0
+        self.ROLL_SVC = 0.0
+        self.YAW_SVC = 270.0 # front-0, left-90, rear-180, right-270
+
+        # bev image params, ps2.0 dataset resolution 600*600
+        self.H_BEV_PIXEL = 1280
         self.W_BEV_PIXEL = 1280
-        self.XMAX_BODY_M = 24
-        self.YMAX_BODY_M = self.XMAX_BODY_M*self.W_BEV_PIXEL/self.H_BEV_PIXEL
+        self.XMAX_BODY_M = 32
+        # keep w/h ratio, so YMAX_BODY_M could be derived from XMAX_BODY_M
+        self.YMAX_BODY_M = self.XMAX_BODY_M * self.W_BEV_PIXEL / self.H_BEV_PIXEL
+
+        # virtual-bev-camera in body-frame, could be same as svc-camera
+        self.X0_BEV = self.X0_SVC #+ self.XMAX_BODY_M/2
+        self.Y0_BEV = self.Y0_SVC
+        self.Z0_BEV = self.Z0_SVC
+        self.PITCH_BEV = 90.0
+        self.ROLL_BEV = 0.0
+        self.YAW_BEV = 0.0
 
         # rotation matrix from camera to body, should never ignored
+        # camera coordinate X-right, Y-down, Z-forward
         self.R0_CAM_TO_BODY = np.array([
             [0.0, 0.0, 1.0],
             [1.0, 0.0, 0.0],
@@ -56,7 +68,7 @@ class CarlaIPM(object):
         self.inv_K_svc_cam = np.linalg.inv(self.K_svc_cam)
         print("K_svc_cam: {}, \n inv_K_svc_cam: {}".format(self.K_svc_cam, self.inv_K_svc_cam))
         # from camera to body, pitch(+Y, right) is 20
-        self.R_svc_cam_to_body = self.rot_mat_from_euler(pitch=20.0, roll=0.0, yaw=0.0) @ self.R0_CAM_TO_BODY
+        self.R_svc_cam_to_body = self.rot_mat_from_euler(pitch=self.PITCH_SVC, roll=self.ROLL_SVC, yaw=self.YAW_SVC) @ self.R0_CAM_TO_BODY
         self.T_svc_cam_to_body = np.array([[self.X0_SVC], [self.Y0_SVC], [self.Z0_SVC]], dtype=np.float32)
         self.Ess_svc_cam_to_body = np.concatenate((np.concatenate((self.R_svc_cam_to_body, self.T_svc_cam_to_body), axis=1), np.array([[0, 0, 0, 1]])), axis=0)
         self.Ess_svc_body_to_cam = np.linalg.inv(self.Ess_svc_cam_to_body)
@@ -70,16 +82,16 @@ class CarlaIPM(object):
             [0.0, self.f_bev_cam, self.H_BEV_PIXEL/2.0],
             [0.0,     0.0,                         1.0]
         ], dtype=np.float32)
-        # intrinsic normalization
-        self.K_bev_cam[0:3, 0:3] = self.K_bev_cam[0:3, 0:3]/self.Z0_BEV
+        # intrinsic normalization, optional
+        self.K_bev_cam = self.K_bev_cam/self.Z0_BEV
         self.inv_K_bev_cam = np.linalg.inv(self.K_bev_cam)
         print("K_bev_cam: {}, \n inv_K_bev_cam: {}".format(self.K_bev_cam, self.inv_K_bev_cam))
         # from camera to body, pitch(+Y, right) is 90
-        self.R_bev_cam_to_body = self.rot_mat_from_euler(pitch=90.0, roll=0.0, yaw=0.0) @ self.R0_CAM_TO_BODY
+        self.R_bev_cam_to_body = self.rot_mat_from_euler(pitch=self.PITCH_BEV, roll=self.ROLL_BEV, yaw=self.YAW_BEV) @ self.R0_CAM_TO_BODY
         # set virtual camera in the center of BEV
         self.T_bev_cam_to_body = np.array([
-            [self.X0_SVC+self.XMAX_BODY_M/2],
-            [self.Y0_SVC],
+            [self.X0_BEV],
+            [self.Y0_BEV],
             [self.Z0_BEV]
         ], dtype=np.float32)
         self.Ess_bev_cam_to_body = np.concatenate((np.concatenate((self.R_bev_cam_to_body, self.T_bev_cam_to_body), axis=1), np.array([[0, 0, 0, 1]])), axis=0)
@@ -98,7 +110,9 @@ class CarlaIPM(object):
         q_pitch = np.quaternion(np.cos(pitch/2), 0, np.sin(pitch/2), 0)
         # yaw: -Z
         q_yaw = np.quaternion(np.cos(-yaw/2), 0, 0, np.sin(-yaw/2))
-        q = q_pitch * q_roll * q_yaw
+        # the rotation sequence of body_to_cam is ZYX, yaw-roll-pitch
+        # so the rotation sequence of cam_to_body is XYZ, roll-pitch-yaw
+        q =  q_yaw * q_pitch * q_roll
         rot = quaternion.as_rotation_matrix(q)
         print("pitch: {:.3f}, roll: {:.3f}, yaw: {:.3f}, \nq: {}, \nrot: {}".format(pitch, roll, yaw, q, rot))
         return rot
