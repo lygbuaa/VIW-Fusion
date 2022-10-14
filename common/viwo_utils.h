@@ -5,7 +5,7 @@
 #include <memory>
 #include <cstdlib>
 #include <ros/ros.h>
-
+#include <opencv2/opencv.hpp>
 
 #define HANG_STOPWATCH() auto _ViwoUtilsPtr_ = ViwoUtils::HangStopWatch(__FUNCTION__);
 
@@ -43,6 +43,14 @@ public:
     static double WheelVelBias(double k = 0.01f){
         /* this noise should keep positive or negative */
         return fabs(RandDouble(k));
+    }
+
+    /* small mat debug print */
+    static std::string CvMat2Str(cv::Mat& mat){
+        cv::Mat oneRow = mat.reshape(0, 1);
+        std::ostringstream os;
+        os << oneRow;
+        return os.str();
     }
 
 };

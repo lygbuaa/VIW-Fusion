@@ -1,0 +1,4 @@
+<launch>
+    <node name="rvizvisualisation" pkg="rviz" type="rviz" output="log" args="-d $(find vins)/../config/avp_rviz_config.rviz" />
+    <node name="vins_estimator" pkg="vins" type="viwo_svc_node" output="screen" args="/home/hugoliu/github/catkin_ws/src/VIW-Fusion/config/carla/svc_town04_01.yaml" />
+</launch>

@@ -1,3 +1,7 @@
+# run svc application
+1. `roslaunch vins svc_carla.launch`
+2. `rosbag play data/avp_town04_20220927.bag` 
+
 # run viwo with loop fusion
 1. `roslaunch vins avp_carla.launch`
 2. `rosbag play data/avp_town04_20220927.bag` 

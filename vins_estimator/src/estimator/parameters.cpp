@@ -67,6 +67,7 @@ int ONLY_INITIAL_WITH_WHEEL;
 int MULTIPLE_THREAD;
 map<int, Eigen::Vector3d> pts_gt;
 std::string IMAGE0_TOPIC, IMAGE1_TOPIC;
+std::string IMAGE_FRONT_TOPIC, IMAGE_LEFT_TOPIC, IMAGE_REAR_TOPIC, IMAGE_RIGHT_TOPIC;
 std::string FEATURE0_TOPIC, FEATURE1_TOPIC;
 std::string GROUNDTRUTH_TOPIC;
 std::string FISHEYE_MASK;
@@ -79,6 +80,8 @@ int FLOW_BACK;
 
 CameraExtrinsicAdjustType CAM_EXT_ADJ_TYPE;
 WheelExtrinsicAdjustType WHEEL_EXT_ADJ_TYPE;
+cv::Mat HOMO_SVC_FRONT_, HOMO_SVC_LEFT_, HOMO_SVC_REAR_, HOMO_SVC_RIGHT_;
+double DELAY_SVC_RIGHT_S_;
 
 template <typename T>
 T readParam(ros::NodeHandle &n, std::string name)
@@ -112,8 +115,19 @@ void readParameters(std::string config_file)
         std::cerr << "ERROR: Wrong path to settings" << std::endl;
     }
 
+    fsSettings["homo_svc_front"] >> HOMO_SVC_FRONT_;
+    fsSettings["homo_svc_left"] >> HOMO_SVC_LEFT_;
+    fsSettings["homo_svc_rear"] >> HOMO_SVC_REAR_;
+    fsSettings["homo_svc_right"] >> HOMO_SVC_RIGHT_;
+    DELAY_SVC_RIGHT_S_ = fsSettings["delay_svc_right"];
+
     fsSettings["image0_topic"] >> IMAGE0_TOPIC;
     fsSettings["image1_topic"] >> IMAGE1_TOPIC;
+    fsSettings["image_front_topic"] >> IMAGE_FRONT_TOPIC;
+    fsSettings["image_left_topic"] >> IMAGE_LEFT_TOPIC;
+    fsSettings["image_rear_topic"] >> IMAGE_REAR_TOPIC;
+    fsSettings["image_right_topic"] >> IMAGE_RIGHT_TOPIC;
+
     fsSettings["feature0_topic"] >> FEATURE0_TOPIC;
     fsSettings["feature1_topic"] >> FEATURE1_TOPIC;
     fsSettings["groundtruth_topic"] >> GROUNDTRUTH_TOPIC;

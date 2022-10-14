@@ -85,7 +85,10 @@ extern int MULTIPLE_THREAD;
 // pts_gt for debug purpose;
 extern map<int, Eigen::Vector3d> pts_gt;
 
+// keep image0 && image1 for compatibility
 extern std::string IMAGE0_TOPIC, IMAGE1_TOPIC;
+extern std::string IMAGE_FRONT_TOPIC, IMAGE_LEFT_TOPIC, IMAGE_REAR_TOPIC, IMAGE_RIGHT_TOPIC;
+
 extern std::string FEATURE0_TOPIC, FEATURE1_TOPIC;
 extern std::string GROUNDTRUTH_TOPIC;
 extern std::string FISHEYE_MASK;
@@ -95,6 +98,8 @@ extern int MIN_DIST;
 extern double F_THRESHOLD;
 extern int SHOW_TRACK;
 extern int FLOW_BACK;
+extern cv::Mat HOMO_SVC_FRONT_, HOMO_SVC_LEFT_, HOMO_SVC_REAR_, HOMO_SVC_RIGHT_;
+extern double DELAY_SVC_RIGHT_S_;
 
 void readParameters(std::string config_file);
 
