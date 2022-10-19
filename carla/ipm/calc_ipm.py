@@ -28,6 +28,7 @@ class CarlaIPM(object):
         self.XMAX_BODY_M = 32
         # keep w/h ratio, so YMAX_BODY_M could be derived from XMAX_BODY_M
         self.YMAX_BODY_M = self.XMAX_BODY_M * self.W_BEV_PIXEL / self.H_BEV_PIXEL
+        self.PIX_DENSITY = self.H_BEV_PIXEL / self.XMAX_BODY_M
 
         # virtual-bev-camera in body-frame, could be same as svc-camera, 
         # but set to center of ego-vehicle, for IPM synthesis.
@@ -147,6 +148,11 @@ class CarlaIPM(object):
     def get_H(self):
         return self.H_svc_to_bev
 
+    def get_cam_center(self):
+        cam_center_m = np.array([self.X0_SVC, self.Y0_SVC])
+        cam_center_pixel = np.array([self.W_BEV_PIXEL/2 + self.Y0_SVC*self.PIX_DENSITY, self.H_BEV_PIXEL/2-self.X0_SVC*self.PIX_DENSITY])
+        print("camera center, meter: {}, pixel: {}".format(cam_center_m, cam_center_pixel))
+
     def test_H(self):
         image_path = "image/front_camera_view.png"
         img_src = cv2.imread(image_path)
@@ -167,12 +173,18 @@ if __name__ == "__main__":
     # svc_front
     ipm = CarlaIPM(x0_svc=2.58, y0_svc=0.0, z0_svc=0.73, yaw_svc=0.0)
     print("svc_front:\n{}".format(ipm.get_H()))
+    ipm.get_cam_center()
     # ipm.test_H()
     ipm = CarlaIPM(x0_svc=0.08, y0_svc=-1.1, z0_svc=0.73, yaw_svc=90.0)
     print("svc_left:\n{}".format(ipm.get_H()))
+    ipm.get_cam_center()
+    # ipm.test_H()
+    # sys.exit(0)
 
     ipm = CarlaIPM(x0_svc=-2.62, y0_svc=0.0, z0_svc=0.73, yaw_svc=180.0)
     print("svc_rear:\n{}".format(ipm.get_H()))
+    ipm.get_cam_center()
 
     ipm = CarlaIPM(x0_svc=0.08, y0_svc=1.1, z0_svc=0.73, yaw_svc=270.0)
     print("svc_right:\n{}".format(ipm.get_H()))
+    ipm.get_cam_center()
