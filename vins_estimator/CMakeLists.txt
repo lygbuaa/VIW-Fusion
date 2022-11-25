@@ -33,12 +33,20 @@ find_package(Sophus REQUIRED)
 # include_directories(/home/td/slam/install/sophus/include)
 
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
+set(ORT_BASE_DIR ${PROJECT_SOURCE_DIR}/../psd/ort)
+set(ORT_LIB ${ORT_BASE_DIR}/onnxruntime-linux-x64-1.13.1/lib/libonnxruntime.so)
+set(PSD_BASE_DIR ${PROJECT_SOURCE_DIR}/../psd)
+
+MESSAGE(STATUS "onnxruntime lib path: " ${ORT_LIB})
+MESSAGE(STATUS "psd base dir: " ${PSD_BASE_DIR})
+
 find_package(Eigen3)
 include_directories(
   ${catkin_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIR}
+  ${ORT_BASE_DIR}/onnxruntime-linux-x64-1.13.1/include
+  ${PSD_BASE_DIR}/inc
 )
-
 
 catkin_package(
   INCLUDE_DIRS src
@@ -84,7 +92,7 @@ add_executable(viwo_node src/rosNodeTestWheel.cpp)
 target_link_libraries(viwo_node vins_lib)
 
 add_executable(viwo_svc_node src/rosNodeViwoSvc.cc)
-target_link_libraries(viwo_svc_node vins_lib)
+target_link_libraries(viwo_svc_node vins_lib ${ORT_LIB})
 
 #add_executable(viwo_gazebo_node src/rosNodeTestWheelGazebo.cpp)
 #target_link_libraries(viwo_gazebo_node vins_lib)
@@ -92,12 +100,12 @@ target_link_libraries(viwo_svc_node vins_lib)
 #add_executable(kitti_odom_test src/KITTIOdomTest.cpp)
 #target_link_libraries(kitti_odom_test vins_lib)
 
-add_executable(simulation_node src/simulationTest.cpp)
-target_link_libraries(simulation_node vins_lib)
+#add_executable(simulation_node src/simulationTest.cpp)
+#target_link_libraries(simulation_node vins_lib)
 
 #add_executable(kitti_gps_test src/KITTIGPSTest.cpp)
 #target_link_libraries(kitti_gps_test vins_lib)
 
-add_executable(bag_writer src/tool/bagwriter.cpp)
-target_link_libraries(bag_writer ${catkin_LIBRARIES})
+#add_executable(bag_writer src/tool/bagwriter.cpp)
+#target_link_libraries(bag_writer ${catkin_LIBRARIES})
 

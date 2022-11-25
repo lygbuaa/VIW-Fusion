@@ -68,6 +68,7 @@ int MULTIPLE_THREAD;
 map<int, Eigen::Vector3d> pts_gt;
 std::string IMAGE0_TOPIC, IMAGE1_TOPIC;
 std::string IMAGE_FRONT_TOPIC, IMAGE_LEFT_TOPIC, IMAGE_REAR_TOPIC, IMAGE_RIGHT_TOPIC;
+std::string PCR_MODEL_PATH, PSD_MODEL_PATH;
 std::string FEATURE0_TOPIC, FEATURE1_TOPIC;
 std::string GROUNDTRUTH_TOPIC;
 std::string FISHEYE_MASK;
@@ -127,6 +128,8 @@ void readParameters(std::string config_file)
     fsSettings["image_left_topic"] >> IMAGE_LEFT_TOPIC;
     fsSettings["image_rear_topic"] >> IMAGE_REAR_TOPIC;
     fsSettings["image_right_topic"] >> IMAGE_RIGHT_TOPIC;
+    fsSettings["pcr_model_path"] >> PCR_MODEL_PATH;
+    fsSettings["psd_model_path"] >> PSD_MODEL_PATH;
 
     fsSettings["feature0_topic"] >> FEATURE0_TOPIC;
     fsSettings["feature1_topic"] >> FEATURE1_TOPIC;

@@ -17,6 +17,7 @@ camera_chessboard_data.dat
 sim_data
 run
 output/
+psd/model/*
 data
 *.pyc
 *.log

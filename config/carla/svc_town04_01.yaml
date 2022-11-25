@@ -18,6 +18,9 @@ image_left_topic: "/carla/ego_vehicle/camera_svc_left/image"
 image_rear_topic: "/carla/ego_vehicle/camera_svc_rear/image"
 image_right_topic: "/carla/ego_vehicle/camera_svc_right/image"
 
+pcr_model_path: "/home/hugoliu/github/catkin_ws/src/VIW-Fusion/psd/model/pcr.onnx"
+psd_model_path: "/home/hugoliu/github/catkin_ws/src/VIW-Fusion/psd/model/psd.nms.onnx"
+
 output_path: "/home/hugoliu/github/catkin_ws/src/VIW-Fusion/output"
 
 cam0_calib: "camera_info_svc_front.yaml"  #/home/hugoliu/github/catkin_ws/src/VIW-Fusion/config/carla/

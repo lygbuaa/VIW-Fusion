@@ -34,6 +34,7 @@ class IpmComposer
 {
 public:
     static constexpr float DT_THRESHOLD_SEC_ = 0.02f;
+    static constexpr int BUFFER_MAX_ = 10;
     static constexpr int BEV_H_ = 640;
     static constexpr int BEV_W_ = 640;
     static constexpr float BEV_XMAX_ = 16.0;
@@ -136,6 +137,9 @@ public:
 
     void PushImage(SvcIndex_t idx, const sensor_msgs::ImageConstPtr& img_msg){
         svc_bufs_[idx] -> push(img_msg);
+	if(svc_bufs_[idx]->size() > BUFFER_MAX_){
+		svc_bufs_[idx] -> pop();
+	}
     }
 
     void PopImage(SvcIndex_t idx){

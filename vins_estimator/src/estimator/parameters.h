@@ -88,6 +88,7 @@ extern map<int, Eigen::Vector3d> pts_gt;
 // keep image0 && image1 for compatibility
 extern std::string IMAGE0_TOPIC, IMAGE1_TOPIC;
 extern std::string IMAGE_FRONT_TOPIC, IMAGE_LEFT_TOPIC, IMAGE_REAR_TOPIC, IMAGE_RIGHT_TOPIC;
+extern std::string PCR_MODEL_PATH, PSD_MODEL_PATH;
 
 extern std::string FEATURE0_TOPIC, FEATURE1_TOPIC;
 extern std::string GROUNDTRUTH_TOPIC;
