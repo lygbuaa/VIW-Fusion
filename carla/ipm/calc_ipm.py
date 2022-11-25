@@ -23,9 +23,9 @@ class CarlaIPM(object):
         self.YAW_SVC = yaw_svc # front:0, left:90, rear:180, right:270
 
         # bev image params, ps2.0 dataset resolution 600*600
-        self.H_BEV_PIXEL = 1080
-        self.W_BEV_PIXEL = 360
-        self.XMAX_BODY_M = 54
+        self.H_BEV_PIXEL = 640
+        self.W_BEV_PIXEL = 640
+        self.XMAX_BODY_M = 16.0
         # keep w/h ratio, so YMAX_BODY_M could be derived from XMAX_BODY_M
         self.YMAX_BODY_M = self.XMAX_BODY_M * self.W_BEV_PIXEL / self.H_BEV_PIXEL
         self.PIX_DENSITY = self.H_BEV_PIXEL / self.XMAX_BODY_M
@@ -174,11 +174,11 @@ if __name__ == "__main__":
     ipm = CarlaIPM(x0_svc=2.58, y0_svc=0.0, z0_svc=0.73, yaw_svc=0.0)
     print("svc_front:\n{}".format(ipm.get_H()))
     ipm.get_cam_center()
-    ipm.test_H()
+    # ipm.test_H()
     ipm = CarlaIPM(x0_svc=0.08, y0_svc=-1.1, z0_svc=0.73, yaw_svc=90.0)
     print("svc_left:\n{}".format(ipm.get_H()))
     ipm.get_cam_center()
-    ipm.test_H()
+    # ipm.test_H()
     # sys.exit(0)
 
     ipm = CarlaIPM(x0_svc=-2.62, y0_svc=0.0, z0_svc=0.73, yaw_svc=180.0)

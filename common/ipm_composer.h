@@ -34,10 +34,10 @@ class IpmComposer
 {
 public:
     static constexpr float DT_THRESHOLD_SEC_ = 0.02f;
-    static constexpr int BEV_H_ = 1080;
-    static constexpr int BEV_W_ = 360;
-    static constexpr float BEV_XMAX_ = 54.0;
-    static constexpr float BEV_YMAX_ = 18.0;
+    static constexpr int BEV_H_ = 640;
+    static constexpr int BEV_W_ = 640;
+    static constexpr float BEV_XMAX_ = 16.0;
+    static constexpr float BEV_YMAX_ = 16.0;
     /* define center point of cameras, 1280*1280, 32*32m */
     // static constexpr float SVC_FRONT_X0 = 640.0f;
     // static constexpr float SVC_FRONT_Y0 = 536.8f;
@@ -49,15 +49,24 @@ public:
     // static constexpr float SVC_RIGHT_Y0 = 636.8f;
 
     /* define center point of cameras, 1080*360, 54*18m */
-    static constexpr float SVC_FRONT_X0 = 180.0f;
-    static constexpr float SVC_FRONT_Y0 = 488.4f;
-    static constexpr float SVC_LEFT_X0 = 158.0f;
-    static constexpr float SVC_LEFT_Y0 = 538.4f;
-    static constexpr float SVC_REAR_X0 = 180.0f;
-    static constexpr float SVC_REAR_Y0 = 592.4f;
-    static constexpr float SVC_RIGHT_X0 = 202.0f;
-    static constexpr float SVC_RIGHT_Y0 = 538.4f;
+    // static constexpr float SVC_FRONT_X0 = 180.0f;
+    // static constexpr float SVC_FRONT_Y0 = 488.4f;
+    // static constexpr float SVC_LEFT_X0 = 158.0f;
+    // static constexpr float SVC_LEFT_Y0 = 538.4f;
+    // static constexpr float SVC_REAR_X0 = 180.0f;
+    // static constexpr float SVC_REAR_Y0 = 592.4f;
+    // static constexpr float SVC_RIGHT_X0 = 202.0f;
+    // static constexpr float SVC_RIGHT_Y0 = 538.4f;
 
+    /* define center point of cameras, 640*640, 16*16m */
+    static constexpr float SVC_FRONT_X0 = 320.0f;
+    static constexpr float SVC_FRONT_Y0 = 216.8f;
+    static constexpr float SVC_LEFT_X0 = 276.0f;
+    static constexpr float SVC_LEFT_Y0 = 316.8f;
+    static constexpr float SVC_REAR_X0 = 320.0f;
+    static constexpr float SVC_REAR_Y0 = 424.8f;
+    static constexpr float SVC_RIGHT_X0 = 364.0f;
+    static constexpr float SVC_RIGHT_Y0 = 316.8f;
 
 private:
     ros::Publisher pub_image_ipm_;
@@ -114,7 +123,7 @@ public:
         homo_svc_right_ = homo_svc_right;
         ROS_INFO("homo_svc_right_: %s", ViwoUtils::CvMat2Str(homo_svc_right_).c_str());
 
-        GenIpmMasksBow2();
+        GenIpmMasksBow1();
     }
 
     ImageQueuePtr_t GetSvcBuffer(SvcIndex_t idx){
@@ -330,8 +339,8 @@ private:
       b = (x2y1-x1y2)/(x1-x2)
      */
     void GenIpmMasksBow1(){
-        //ratio of width start-point, 0.0~0.5
-        const float R = 0.16f; 
+        //ratio of width start-point, 0.0~0.5, 0.128 for w=640, 0.16 for w=1280
+        const float R = 0.128f;
 
         /* line_left_forward */
         float k_lf, b_lf;
@@ -445,8 +454,6 @@ private:
         // cv::imwrite((filepath+"/svc_rear_mask.png").c_str(), 255*ipm_mask_svc_rear_);
         // cv::imwrite((filepath+"/svc_right_mask.png").c_str(), 255*ipm_mask_svc_right_);
     }
-
-
 
 };
 
