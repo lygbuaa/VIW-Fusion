@@ -22,6 +22,11 @@ import carla
 
 import math
 import random
+sys.path.append("../utils")
+import plogging
+global g_logger
+plogging.init_logger(log_dir="./", file_name="carla_client")
+g_logger = plogging.get_logger()
 
 
 def get_transform(vehicle_location, angle, d=6.4):
@@ -29,6 +34,13 @@ def get_transform(vehicle_location, angle, d=6.4):
     location = carla.Location(d * math.cos(a), d * math.sin(a), 2.0) + vehicle_location
     return carla.Transform(location, carla.Rotation(yaw=180 + angle, pitch=-15))
 
+def print_vehicle_info(ego_vehicle):
+    # print ego vehicle info
+    ego_bbx = ego_vehicle.bounding_box
+    g_logger.info("%s bounding box, extent: %s, location: %s, rotation: %s", ego_vehicle.type_id, ego_bbx.extent, ego_bbx.location, ego_bbx.rotation)
+    ego_spd_limit = ego_vehicle.get_speed_limit()
+    ego_steer_fl = ego_vehicle.get_wheel_steer_angle(carla.VehicleWheelLocation.FL_Wheel)
+    g_logger.info("%s speed limit: %s m/s, ego steer front left wheel: %s", ego_vehicle.type_id, str(ego_spd_limit), str(ego_steer_fl))
 
 def main():
     client = carla.Client('localhost', 2000)
@@ -44,11 +56,11 @@ def main():
         vehicle = world.spawn_actor(blueprint, transform)
 
         try:
-
             print(vehicle.type_id)
+            print_vehicle_info(vehicle)
 
             angle = 0
-            while angle < 356:
+            while angle < 60:
                 timestamp = world.wait_for_tick().timestamp
                 angle += timestamp.delta_seconds * 60.0
                 spectator.set_transform(get_transform(vehicle.get_location(), angle - 90))

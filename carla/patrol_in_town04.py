@@ -524,7 +524,7 @@ def main():
         help='enable rendering')
     argparser.add_argument(
         '--map',
-        default='Town04',
+        default='Town04_Opt',
         help='load a new map, use --list to see available maps')
     argparser.add_argument(
         '--max_throttle',
