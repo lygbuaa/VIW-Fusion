@@ -63,36 +63,26 @@ void img_right_callback(const sensor_msgs::ImageConstPtr &img_msg)
 
 void wheel_callback(const nav_msgs::OdometryConstPtr &odom_msg)
 {
-    double t = odom_msg->header.stamp.toSec();
-    double dx = odom_msg->twist.twist.linear.x;
-    double dy = odom_msg->twist.twist.linear.y;
-    double dz = odom_msg->twist.twist.linear.z;
-    double rx = odom_msg->twist.twist.angular.x;
-    double ry = odom_msg->twist.twist.angular.y;
-    double rz = odom_msg->twist.twist.angular.z;
-    Eigen::Vector3d vel(dx, dy, dz);
-    Eigen::Vector3d gyr(rx, ry, rz);
-    // estimator.inputWheel(t, vel, gyr);
+    std::unique_lock<std::mutex> lock(m_buf_);
+    g_ipm_composer_ -> PushOdom(odom_msg);
+    // double t = odom_msg->header.stamp.toSec();
+    // double dx = odom_msg->twist.twist.linear.x;
+    // double dy = odom_msg->twist.twist.linear.y;
+    // double dz = odom_msg->twist.twist.linear.z;
+    // double rx = odom_msg->twist.twist.angular.x;
+    // double ry = odom_msg->twist.twist.angular.y;
+    // double rz = odom_msg->twist.twist.angular.z;
+    // Eigen::Vector3d vel(dx, dy, dz);
+    // Eigen::Vector3d gyr(rx, ry, rz);
 
-#if 1
-    static Eigen::Matrix<double,7,1> init_pose;
-    static bool init_done = false;
     /* use wheel pose as groundtruth */
-    auto tmp_Q = odom_msg->pose.pose.orientation;
-    auto tmp_t = odom_msg->pose.pose.position;
-    Eigen::Matrix<double,7,1> data;
-    data << tmp_Q.w, tmp_Q.x, tmp_Q.y, tmp_Q.z, tmp_t.x, tmp_t.y, tmp_t.z;
-    if(!init_done){
-        init_pose = data;
-        init_done = true;
-    }else{
-        /* only correct translation initial pose */
-        data[4] -= init_pose[4];
-        data[5] -= init_pose[5];
-        data[6] -= init_pose[6];
-    }
-    // estimator.inputGroundtruth(t, data);
-#endif
+    // auto tmp_Q = odom_msg->pose.pose.orientation;
+    // auto tmp_T = odom_msg->pose.pose.position;
+    // Eigen::Matrix<double, 7, 1> data;
+    // data << tmp_Q.w, tmp_Q.x, tmp_Q.y, tmp_Q.z, tmp_T.x, tmp_T.y, tmp_T.z;
+    // Eigen::Quaterniond quat(tmp_Q.w, tmp_Q.x, tmp_Q.y, tmp_Q.z);
+    // Eigen::Vector3d loc(tmp_T.x, tmp_T.y, tmp_T.z);
+    // g_ipm_composer_ -> PushOdom(quat, loc);
 
     return;
 }
@@ -209,7 +199,7 @@ int main(int argc, char **argv)
     ROS_WARN("waiting for image and imu...");
 
     // ros::Subscriber sub_imu = n.subscribe(IMU_TOPIC, 2000, imu_callback, ros::TransportHints().tcpNoDelay());
-    // ros::Subscriber sub_wheel = n.subscribe(WHEEL_TOPIC, 2000, wheel_callback, ros::TransportHints().tcpNoDelay());
+    ros::Subscriber sub_wheel = n.subscribe(g_param_loader_->wheel_topic_, 100, wheel_callback, ros::TransportHints().tcpNoDelay());
     std::thread sync_thread{sync_process};
     ros::spin();
     return 0;

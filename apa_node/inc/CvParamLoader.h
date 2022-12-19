@@ -43,6 +43,8 @@ public:
     std::string image_rear_topic_;
     std::string image_right_topic_;
 
+    std::string wheel_topic_;
+
 private:
     std::string yaml_path_;
     cv::FileStorage fs_;
@@ -107,6 +109,7 @@ public:
         fs_["image_left_topic"] >> image_left_topic_;
         fs_["image_rear_topic"] >> image_rear_topic_;
         fs_["image_right_topic"] >> image_right_topic_;
+        fs_["wheel_topic"] >> wheel_topic_;
         fprintf(stderr, "image_front_topic: %s, image_left_topic: %s, image_rear_topic: %s, image_right_topic: %s\n", \
             image_front_topic_.c_str(), image_left_topic_.c_str(), image_rear_topic_.c_str(), image_right_topic_.c_str());
     }

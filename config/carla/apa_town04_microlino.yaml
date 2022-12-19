@@ -8,6 +8,9 @@ image_left_topic: "/carla/ego_vehicle/camera_svc_left/image"
 image_rear_topic: "/carla/ego_vehicle/camera_svc_rear/image"
 image_right_topic: "/carla/ego_vehicle/camera_svc_right/image"
 
+imu_topic: "/carla/ego_vehicle/imu"
+wheel_topic: "/carla/ego_vehicle/odometry" 
+
 pcr_model_path: "model/pcr.onnx"
 psd_model_path: "model/psd.nms.onnx"
 output_path: "output"

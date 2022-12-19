@@ -4,6 +4,7 @@
 #include <ros/ros.h>
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/opencv.hpp>
+#include <nav_msgs/Odometry.h>
 #include "viwo_utils.h"
 #include "CvParamLoader.h"
 
@@ -20,6 +21,7 @@ enum class SvcIndex_t : int{
 using SvcTimestampVector_t = std::vector<std::tuple<SvcIndex_t, double>>;
 using ImageQueuePtr_t = std::shared_ptr<std::queue<sensor_msgs::ImageConstPtr>>;
 using SvcImageBuffer_t = std::map<SvcIndex_t, ImageQueuePtr_t>;
+using OdomQueuePtr_t = std::shared_ptr<std::queue<nav_msgs::OdometryConstPtr>>;
 // using SvcPairedImages_t = std::map<SvcIndex_t, sensor_msgs::ImageConstPtr>;
 
 typedef struct{
@@ -29,6 +31,11 @@ typedef struct{
     cv::Mat img_rear;
     cv::Mat img_right;
     cv::Mat img_ipm;
+    double x=0.0f;
+    double y=0.0f;
+    double z=0.0f;
+    double pitch=0.0f;
+    double roll=0.0f;
 } SvcPairedImages_t;
 
 class IpmComposer
@@ -37,20 +44,7 @@ public:
     IPM_PARAMS_t PARAMS_;
     static constexpr float DT_THRESHOLD_SEC_ = 0.02f;
     static constexpr int BUFFER_MAX_ = 10;
-    // static constexpr int BEV_H_ = 640;
-    // static constexpr int BEV_W_ = 640;
-    // static constexpr float BEV_XMAX_ = 16.0;
-    // static constexpr float BEV_YMAX_ = 16.0;
-
-    // /* define center point of cameras, 640*640, 16*16m */
-    // static constexpr float SVC_FRONT_X0 = 320.0f;
-    // static constexpr float SVC_FRONT_Y0 = 216.8f;
-    // static constexpr float SVC_LEFT_X0 = 276.0f;
-    // static constexpr float SVC_LEFT_Y0 = 316.8f;
-    // static constexpr float SVC_REAR_X0 = 320.0f;
-    // static constexpr float SVC_REAR_Y0 = 424.8f;
-    // static constexpr float SVC_RIGHT_X0 = 364.0f;
-    // static constexpr float SVC_RIGHT_Y0 = 316.8f;
+    static constexpr double PI_ = 3.141592741;
 
 private:
     ros::Publisher pub_image_ipm_;
@@ -59,10 +53,7 @@ private:
     ImageQueuePtr_t svc_left_buf_ptr_;
     ImageQueuePtr_t svc_rear_buf_ptr_;
     ImageQueuePtr_t svc_right_buf_ptr_;
-    // cv::Mat homo_svc_front_;
-    // cv::Mat homo_svc_left_;
-    // cv::Mat homo_svc_rear_;
-    // cv::Mat homo_svc_right_;
+    OdomQueuePtr_t odom_buf_ptr_;
     cv::Mat ipm_mask_svc_front_;
     cv::Mat ipm_mask_svc_left_;
     cv::Mat ipm_mask_svc_rear_;
@@ -75,6 +66,7 @@ public:
         svc_left_buf_ptr_ = ImageQueuePtr_t(new std::queue<sensor_msgs::ImageConstPtr>());
         svc_rear_buf_ptr_ = ImageQueuePtr_t(new std::queue<sensor_msgs::ImageConstPtr>());
         svc_right_buf_ptr_ = ImageQueuePtr_t(new std::queue<sensor_msgs::ImageConstPtr>());
+        odom_buf_ptr_ = OdomQueuePtr_t(new std::queue<nav_msgs::OdometryConstPtr>());
 
         svc_bufs_[SvcIndex_t::FRONT] = svc_front_buf_ptr_;
         svc_bufs_[SvcIndex_t::LEFT] = svc_left_buf_ptr_;
@@ -128,6 +120,14 @@ public:
         return (svc_front_buf_ptr_->empty() || svc_left_buf_ptr_->empty() || svc_rear_buf_ptr_->empty() || svc_right_buf_ptr_->empty());
     }
 
+    //Eigen::Quaterniond& quat, Eigen::Vector3d& loc
+    void PushOdom(const nav_msgs::OdometryConstPtr &odom_msg){
+        odom_buf_ptr_ -> push(odom_msg);
+        if(odom_buf_ptr_->size() > BUFFER_MAX_*10){
+            odom_buf_ptr_ -> pop();
+        }
+    }
+
     void PushImage(SvcIndex_t idx, const sensor_msgs::ImageConstPtr& img_msg){
         svc_bufs_[idx] -> push(img_msg);
         if(svc_bufs_[idx]->size() > BUFFER_MAX_){
@@ -173,6 +173,41 @@ public:
         paired_images.img_left = GetImageFromMsg(svc_left_buf_ptr_->front());
         paired_images.img_rear = GetImageFromMsg(svc_rear_buf_ptr_->front());
         paired_images.img_right = GetImageFromMsg(svc_right_buf_ptr_->front());
+
+        while(!odom_buf_ptr_->empty()){
+            auto odom_msg = odom_buf_ptr_->front();
+            double t = odom_msg->header.stamp.toSec();
+            if (t < paired_images.time-DT_THRESHOLD_SEC_){
+                odom_buf_ptr_->pop();
+                continue;
+            }else if(t > paired_images.time+DT_THRESHOLD_SEC_){
+                ROS_ERROR("impossisble, image time: %f, odom time: %f", paired_images.time, t);
+            }else{
+                auto tmp_Q = odom_msg->pose.pose.orientation;
+                auto tmp_T = odom_msg->pose.pose.position;
+                Eigen::Quaterniond quat = Eigen::Quaterniond(tmp_Q.w, tmp_Q.x, tmp_Q.y, tmp_Q.z);
+                // 0-z-yaw, 1-x-roll, 2-y-pitch
+                Eigen::Vector3d euler = quat.toRotationMatrix().eulerAngles(2, 0, 1);
+                paired_images.roll = euler[1];
+                if(paired_images.roll>PI_/2.0){
+                    paired_images.roll -= PI_;
+                }else if(paired_images.roll<-1*PI_/2.0){
+                    paired_images.roll += PI_;
+                }
+                paired_images.pitch = euler[2];
+                if(paired_images.pitch>PI_/2.0){
+                    paired_images.pitch -= PI_;
+                }else if(paired_images.pitch<-1*PI_/2.0){
+                    paired_images.pitch += PI_;
+                }
+                Eigen::Vector3d loc = Eigen::Vector3d(tmp_T.x, tmp_T.y, tmp_T.z);
+                paired_images.x = loc[0];
+                paired_images.y = loc[1];
+                paired_images.z = loc[2];
+                ROS_INFO("sync image time: %f, odom time: %f", paired_images.time, t);
+                break;
+            }
+        }
     }
 
     void Compose(SvcPairedImages_t& pis, bool debug_save=false, std::string path="./"){
@@ -200,6 +235,12 @@ public:
         cv::warpPerspective(img_right, tmp, PARAMS_.HOMO_SVC_RIGHT_, tmp.size(), cv::INTER_NEAREST);
         tmp.setTo(cv::Scalar(0,0,0), ipm_mask_svc_right_);
         ipm += tmp;
+
+        char tmpstr[64] = {0};
+        sprintf(tmpstr, "rpxyz: %.2f, %.2f, %.2f, %.2f, %.2f", pis.roll*57.3, pis.pitch*57.3, pis.x, pis.y, pis.z);
+        cv::Point org(10, 20);
+        cv::Scalar yellow(0, 255, 255);
+        cv::putText(ipm, tmpstr, org, cv::FONT_HERSHEY_DUPLEX, 0.6, yellow, 1);
 
         PubIpmImage(ipm, pis.time);
 
