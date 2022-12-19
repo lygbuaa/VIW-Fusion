@@ -125,7 +125,7 @@ void sync_process()
                 // }
                 // g_ipm_composer_ -> Compose(pis, true, OUTPUT_FOLDER);
                 g_ipm_composer_ -> Compose(pis, false);
-		//g_json_dataset_ -> feed(pis.time, pis.img_front, pis.img_left, pis.img_right, pis.img_rear);
+		g_json_dataset_ -> feed(pis.time, pis.img_front, pis.img_left, pis.img_right, pis.img_rear);
                 g_ipm_composer_ -> PopImage(SvcIndex_t::ALL);
                 // ROS_INFO("get sync images, ts_front: %f", time);
             }
@@ -136,10 +136,10 @@ void sync_process()
             /* send paired images into estimator */
             //estimator.inputImage(time, image0, image1);
             time = -1.0f;
-	    psdonnx::Detections_t det;
-	    std::string psd_save_path = OUTPUT_FOLDER + "/" + std::to_string(pis.time) + "_psd.png";
-	    //g_psd_wrapper_ -> run_model(pis.img_ipm, det, true, psd_save_path);
-	    g_psd_wrapper_ -> run_model(pis.img_ipm, det);
+	        // psdonnx::Detections_t det;
+	        // std::string psd_save_path = OUTPUT_FOLDER + "/" + std::to_string(pis.time) + "_psd.png";
+	        //g_psd_wrapper_ -> run_model(pis.img_ipm, det, true, psd_save_path);
+	        // g_psd_wrapper_ -> run_model(pis.img_ipm, det);
         }
 
         std::chrono::milliseconds dura(5);
@@ -205,8 +205,8 @@ int main(int argc, char **argv)
     g_ipm_composer_ = std::unique_ptr<IpmComposer>(new IpmComposer());
     g_ipm_composer_ -> InitIpmPub(n);
     g_ipm_composer_ -> SetHomography(HOMO_SVC_FRONT_, HOMO_SVC_LEFT_, HOMO_SVC_REAR_, HOMO_SVC_RIGHT_);
-    g_psd_wrapper_ = std::unique_ptr<psdonnx::PsdWrapper>(new psdonnx::PsdWrapper());
-    g_psd_wrapper_ -> load_model(PCR_MODEL_PATH, PSD_MODEL_PATH);
+    // g_psd_wrapper_ = std::unique_ptr<psdonnx::PsdWrapper>(new psdonnx::PsdWrapper());
+    // g_psd_wrapper_ -> load_model(PCR_MODEL_PATH, PSD_MODEL_PATH);
     g_json_dataset_ = std::unique_ptr<psdonnx::JsonDataset>(new psdonnx::JsonDataset(OUTPUT_FOLDER));
 
     ros::Subscriber sub_img_front = n.subscribe(IMAGE_FRONT_TOPIC, 100, img_front_callback);

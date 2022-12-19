@@ -18,6 +18,7 @@ sim_data
 run
 output/
 psd/model/*
+carla/map/*
 data
 *.pyc
 *.log

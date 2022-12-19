@@ -171,20 +171,20 @@ class CarlaIPM(object):
 
 if __name__ == "__main__":
     # svc_front
-    ipm = CarlaIPM(x0_svc=2.58, y0_svc=0.0, z0_svc=0.73, yaw_svc=0.0)
+    ipm = CarlaIPM(x0_svc=1.10, y0_svc=0.0, z0_svc=0.65, yaw_svc=0.0)
     print("svc_front:\n{}".format(ipm.get_H()))
     ipm.get_cam_center()
     # ipm.test_H()
-    ipm = CarlaIPM(x0_svc=0.08, y0_svc=-1.1, z0_svc=0.73, yaw_svc=90.0)
+    ipm = CarlaIPM(x0_svc=0.0, y0_svc=-0.74, z0_svc=0.65, yaw_svc=90.0)
     print("svc_left:\n{}".format(ipm.get_H()))
     ipm.get_cam_center()
     # ipm.test_H()
     # sys.exit(0)
 
-    ipm = CarlaIPM(x0_svc=-2.62, y0_svc=0.0, z0_svc=0.73, yaw_svc=180.0)
+    ipm = CarlaIPM(x0_svc=-1.10, y0_svc=0.0, z0_svc=0.65, yaw_svc=180.0)
     print("svc_rear:\n{}".format(ipm.get_H()))
     ipm.get_cam_center()
 
-    ipm = CarlaIPM(x0_svc=0.08, y0_svc=1.1, z0_svc=0.73, yaw_svc=270.0)
+    ipm = CarlaIPM(x0_svc=0.0, y0_svc=0.74, z0_svc=0.65, yaw_svc=270.0)
     print("svc_right:\n{}".format(ipm.get_H()))
     ipm.get_cam_center()
