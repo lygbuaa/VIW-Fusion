@@ -1,0 +1,65 @@
+%YAML:1.0
+
+#common parameters
+project_rootdir: "/home/hugoliu/github/catkin_ws/src/VIW-Fusion/"
+
+image_front_topic: "/carla/ego_vehicle/camera_svc_front/image"
+image_left_topic: "/carla/ego_vehicle/camera_svc_left/image"
+image_rear_topic: "/carla/ego_vehicle/camera_svc_rear/image"
+image_right_topic: "/carla/ego_vehicle/camera_svc_right/image"
+
+pcr_model_path: "model/pcr.onnx"
+psd_model_path: "model/psd.nms.onnx"
+output_path: "output"
+dataset_path: "dataset"
+car_top_image_path: "apa_node/assets/car_top.png"
+
+image_width: 1920
+image_height: 1080
+
+bev_h: 640
+bev_w: 640
+bev_xmax: 20.0
+bev_ymax: 20.0
+svc_front_x0: 320.0
+svc_front_y0: 284.8
+svc_left_x0: 296.32
+svc_left_y0: 320.0
+svc_rear_x0: 320.0
+svc_rear_y0: 355.2
+svc_right_x0: 343.68
+svc_right_y0: 320.0
+
+homo_svc_front: !!opencv-matrix
+  rows: 3
+  cols: 3
+  dt: d
+  data: [5.77350558e-02,  8.34664736e-01, -3.37765457e+02,
+        -0.00000000e+00,  7.62598165e-01, -2.92015727e+02,
+        -0.00000000e+00,  2.60832730e-03, -8.82311887e-01]
+
+homo_svc_left: !!opencv-matrix
+  rows: 3
+  cols: 3
+  dt: d
+  data: [-1.69336509e-16,  7.92646097e-01, -3.02179960e+02,
+         -5.77350558e-02,  8.34664736e-01, -2.26914150e+02,
+         -5.58192992e-19,  2.60832730e-03, -8.82311887e-01]
+
+homo_svc_rear: !!opencv-matrix
+  rows: 3
+  cols: 3
+  dt: d
+  data: [-5.77350558e-02,  8.34664736e-01, -2.26914150e+02,
+         -7.07050512e-18,  9.06731307e-01, -2.72663881e+02,
+         -1.43343393e-35,  2.60832730e-03, -8.82311887e-01]
+
+homo_svc_right: !!opencv-matrix
+  rows: 3
+  cols: 3
+  dt: d
+  data: [1.34306179e-16,  8.76683376e-01, -2.62499648e+02,
+         5.77350558e-02,  8.34664736e-01, -3.37765457e+02,
+         4.58738899e-19,  2.60832730e-03, -8.82311887e-01]
+
+delay_svc_right: 0.0

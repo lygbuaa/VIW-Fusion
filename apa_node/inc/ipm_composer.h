@@ -5,6 +5,7 @@
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/opencv.hpp>
 #include "viwo_utils.h"
+#include "CvParamLoader.h"
 
 enum class SvcIndex_t : int{
     VOID = -1,
@@ -33,41 +34,23 @@ typedef struct{
 class IpmComposer
 {
 public:
+    IPM_PARAMS_t PARAMS_;
     static constexpr float DT_THRESHOLD_SEC_ = 0.02f;
     static constexpr int BUFFER_MAX_ = 10;
-    static constexpr int BEV_H_ = 640;
-    static constexpr int BEV_W_ = 640;
-    static constexpr float BEV_XMAX_ = 16.0;
-    static constexpr float BEV_YMAX_ = 16.0;
-    /* define center point of cameras, 1280*1280, 32*32m */
-    // static constexpr float SVC_FRONT_X0 = 640.0f;
-    // static constexpr float SVC_FRONT_Y0 = 536.8f;
-    // static constexpr float SVC_LEFT_X0 = 596.0f;
-    // static constexpr float SVC_LEFT_Y0 = 636.8f;
-    // static constexpr float SVC_REAR_X0 = 640.0f;
-    // static constexpr float SVC_REAR_Y0 = 744.8f;
-    // static constexpr float SVC_RIGHT_X0 = 684.0f;
-    // static constexpr float SVC_RIGHT_Y0 = 636.8f;
+    // static constexpr int BEV_H_ = 640;
+    // static constexpr int BEV_W_ = 640;
+    // static constexpr float BEV_XMAX_ = 16.0;
+    // static constexpr float BEV_YMAX_ = 16.0;
 
-    /* define center point of cameras, 1080*360, 54*18m */
-    // static constexpr float SVC_FRONT_X0 = 180.0f;
-    // static constexpr float SVC_FRONT_Y0 = 488.4f;
-    // static constexpr float SVC_LEFT_X0 = 158.0f;
-    // static constexpr float SVC_LEFT_Y0 = 538.4f;
-    // static constexpr float SVC_REAR_X0 = 180.0f;
-    // static constexpr float SVC_REAR_Y0 = 592.4f;
-    // static constexpr float SVC_RIGHT_X0 = 202.0f;
-    // static constexpr float SVC_RIGHT_Y0 = 538.4f;
-
-    /* define center point of cameras, 640*640, 16*16m */
-    static constexpr float SVC_FRONT_X0 = 320.0f;
-    static constexpr float SVC_FRONT_Y0 = 216.8f;
-    static constexpr float SVC_LEFT_X0 = 276.0f;
-    static constexpr float SVC_LEFT_Y0 = 316.8f;
-    static constexpr float SVC_REAR_X0 = 320.0f;
-    static constexpr float SVC_REAR_Y0 = 424.8f;
-    static constexpr float SVC_RIGHT_X0 = 364.0f;
-    static constexpr float SVC_RIGHT_Y0 = 316.8f;
+    // /* define center point of cameras, 640*640, 16*16m */
+    // static constexpr float SVC_FRONT_X0 = 320.0f;
+    // static constexpr float SVC_FRONT_Y0 = 216.8f;
+    // static constexpr float SVC_LEFT_X0 = 276.0f;
+    // static constexpr float SVC_LEFT_Y0 = 316.8f;
+    // static constexpr float SVC_REAR_X0 = 320.0f;
+    // static constexpr float SVC_REAR_Y0 = 424.8f;
+    // static constexpr float SVC_RIGHT_X0 = 364.0f;
+    // static constexpr float SVC_RIGHT_Y0 = 316.8f;
 
 private:
     ros::Publisher pub_image_ipm_;
@@ -76,14 +59,15 @@ private:
     ImageQueuePtr_t svc_left_buf_ptr_;
     ImageQueuePtr_t svc_rear_buf_ptr_;
     ImageQueuePtr_t svc_right_buf_ptr_;
-    cv::Mat homo_svc_front_;
-    cv::Mat homo_svc_left_;
-    cv::Mat homo_svc_rear_;
-    cv::Mat homo_svc_right_;
+    // cv::Mat homo_svc_front_;
+    // cv::Mat homo_svc_left_;
+    // cv::Mat homo_svc_rear_;
+    // cv::Mat homo_svc_right_;
     cv::Mat ipm_mask_svc_front_;
     cv::Mat ipm_mask_svc_left_;
     cv::Mat ipm_mask_svc_rear_;
     cv::Mat ipm_mask_svc_right_;
+    cv::Mat car_top_view_;
 
 public:
     IpmComposer() {
@@ -97,34 +81,43 @@ public:
         svc_bufs_[SvcIndex_t::REAR] = svc_rear_buf_ptr_;
         svc_bufs_[SvcIndex_t::RIGHT] = svc_right_buf_ptr_;
 
-        homo_svc_front_ = cv::Mat::eye(3, 3, CV_32F);
-        homo_svc_left_ = cv::Mat::eye(3, 3, CV_32F);
-        homo_svc_rear_ = cv::Mat::eye(3, 3, CV_32F);
-        homo_svc_right_ = cv::Mat::eye(3, 3, CV_32F);
+        PARAMS_.HOMO_SVC_FRONT_ = cv::Mat::eye(3, 3, CV_32F);
+        PARAMS_.HOMO_SVC_LEFT_ = cv::Mat::eye(3, 3, CV_32F);
+        PARAMS_.HOMO_SVC_REAR_ = cv::Mat::eye(3, 3, CV_32F);
+        PARAMS_.HOMO_SVC_RIGHT_ = cv::Mat::eye(3, 3, CV_32F);
 
-        ipm_mask_svc_front_ = cv::Mat::ones(BEV_H_, BEV_W_, CV_8UC1);
-        ipm_mask_svc_left_ = cv::Mat::ones(BEV_H_, BEV_W_, CV_8UC1);
-        ipm_mask_svc_rear_ = cv::Mat::ones(BEV_H_, BEV_W_, CV_8UC1);
-        ipm_mask_svc_right_ = cv::Mat::ones(BEV_H_, BEV_W_, CV_8UC1);
+        ipm_mask_svc_front_ = cv::Mat::ones(PARAMS_.BEV_H_, PARAMS_.BEV_W_, CV_8UC1);
+        ipm_mask_svc_left_ = cv::Mat::ones(PARAMS_.BEV_H_, PARAMS_.BEV_W_, CV_8UC1);
+        ipm_mask_svc_rear_ = cv::Mat::ones(PARAMS_.BEV_H_, PARAMS_.BEV_W_, CV_8UC1);
+        ipm_mask_svc_right_ = cv::Mat::ones(PARAMS_.BEV_H_, PARAMS_.BEV_W_, CV_8UC1);
     }
 
     ~IpmComposer() {}
 
-    void InitIpmPub(ros::NodeHandle& n){
-        pub_image_ipm_ = n.advertise<sensor_msgs::Image>("image_ipm", 1000);
+    void SetParams(IPM_PARAMS_t params){
+        PARAMS_ = params;
+        ROS_INFO("PARAMS_.HOMO_SVC_FRONT_: %s\n", ViwoUtils::CvMat2Str(PARAMS_.HOMO_SVC_FRONT_).c_str());
+        ROS_INFO("PARAMS_.HOMO_SVC_LEFT_: %s\n", ViwoUtils::CvMat2Str(PARAMS_.HOMO_SVC_LEFT_).c_str());
+        ROS_INFO("PARAMS_.HOMO_SVC_REAR_: %s\n", ViwoUtils::CvMat2Str(PARAMS_.HOMO_SVC_REAR_).c_str());
+        ROS_INFO("PARAMS_.HOMO_SVC_RIGHT_: %s\n", ViwoUtils::CvMat2Str(PARAMS_.HOMO_SVC_RIGHT_).c_str());
+        GenIpmMasksBow1();
     }
 
-    void SetHomography(cv::Mat& homo_svc_front, cv::Mat& homo_svc_left, cv::Mat& homo_svc_rear, cv::Mat& homo_svc_right){
-        homo_svc_front_ = homo_svc_front;
-        ROS_INFO("homo_svc_front_: %s", ViwoUtils::CvMat2Str(homo_svc_front_).c_str());
-        homo_svc_left_ = homo_svc_left;
-        ROS_INFO("homo_svc_left_: %s", ViwoUtils::CvMat2Str(homo_svc_left_).c_str());
-        homo_svc_rear_ = homo_svc_rear;
-        ROS_INFO("homo_svc_rear_: %s", ViwoUtils::CvMat2Str(homo_svc_rear_).c_str());
-        homo_svc_right_ = homo_svc_right;
-        ROS_INFO("homo_svc_right_: %s", ViwoUtils::CvMat2Str(homo_svc_right_).c_str());
+    bool ReadCarModel(std::string car_img_path){
+        cv::Mat car_top_view = cv::imread(car_img_path, cv::IMREAD_COLOR);
+        float h_w_ration = (float)car_top_view.rows / car_top_view.cols;
+        PARAMS_.CAR_MODEL_W_ = int(PARAMS_.SVC_RIGHT_X0_ - PARAMS_.SVC_LEFT_X0_) + 10;
+        // PARAMS_.CAR_MODEL_H_ = int(PARAMS_.SVC_REAR_Y0_ - PARAMS_.SVC_FRONT_Y0_) + 2;
+        PARAMS_.CAR_MODEL_H_ = int(PARAMS_.CAR_MODEL_W_ * h_w_ration);
+        car_top_view_ = psdonnx::PreProcessor::resize(car_top_view, PARAMS_.CAR_MODEL_W_, PARAMS_.CAR_MODEL_H_);
+        PARAMS_.CAR_MODEL_X0_ = (PARAMS_.BEV_W_-PARAMS_.CAR_MODEL_W_)/2 - 1;
+        PARAMS_.CAR_MODEL_Y0_ = (PARAMS_.BEV_H_-PARAMS_.CAR_MODEL_H_)/2 - 1;
+        ROS_INFO("car model x: %d, y: %d, w: %d, h: %d\n", PARAMS_.CAR_MODEL_X0_, PARAMS_.CAR_MODEL_Y0_, PARAMS_.CAR_MODEL_W_, PARAMS_.CAR_MODEL_H_);
+        return true;
+    }
 
-        GenIpmMasksBow1();
+    void InitIpmPub(ros::NodeHandle& n){
+        pub_image_ipm_ = n.advertise<sensor_msgs::Image>("image_ipm", 1000);
     }
 
     ImageQueuePtr_t GetSvcBuffer(SvcIndex_t idx){
@@ -137,9 +130,9 @@ public:
 
     void PushImage(SvcIndex_t idx, const sensor_msgs::ImageConstPtr& img_msg){
         svc_bufs_[idx] -> push(img_msg);
-	if(svc_bufs_[idx]->size() > BUFFER_MAX_){
-		svc_bufs_[idx] -> pop();
-	}
+        if(svc_bufs_[idx]->size() > BUFFER_MAX_){
+            svc_bufs_[idx] -> pop();
+        }
     }
 
     void PopImage(SvcIndex_t idx){
@@ -190,21 +183,21 @@ public:
         const cv::Mat& img_right = pis.img_right;
         cv::Mat& ipm = pis.img_ipm;
 
-        ipm = cv::Mat::zeros(BEV_H_, BEV_W_, CV_8UC3);
-        cv::Mat tmp(BEV_H_, BEV_W_, CV_8UC3);
-        cv::warpPerspective(img_front, tmp, homo_svc_front_, tmp.size(), cv::INTER_NEAREST);
+        ipm = cv::Mat::zeros(PARAMS_.BEV_H_, PARAMS_.BEV_W_, CV_8UC3);
+        cv::Mat tmp(PARAMS_.BEV_H_, PARAMS_.BEV_W_, CV_8UC3);
+        cv::warpPerspective(img_front, tmp, PARAMS_.HOMO_SVC_FRONT_, tmp.size(), cv::INTER_NEAREST);
         tmp.setTo(cv::Scalar(0,0,0), ipm_mask_svc_front_);
         ipm += tmp;
 
-        cv::warpPerspective(img_left, tmp, homo_svc_left_, tmp.size(), cv::INTER_NEAREST);
+        cv::warpPerspective(img_left, tmp, PARAMS_.HOMO_SVC_LEFT_, tmp.size(), cv::INTER_NEAREST);
         tmp.setTo(cv::Scalar(0,0,0), ipm_mask_svc_left_);
         ipm += tmp;
 
-        cv::warpPerspective(img_rear, tmp, homo_svc_rear_, tmp.size(), cv::INTER_NEAREST);
+        cv::warpPerspective(img_rear, tmp, PARAMS_.HOMO_SVC_REAR_, tmp.size(), cv::INTER_NEAREST);
         tmp.setTo(cv::Scalar(0,0,0), ipm_mask_svc_rear_);
         ipm += tmp;
 
-        cv::warpPerspective(img_right, tmp, homo_svc_right_, tmp.size(), cv::INTER_NEAREST);
+        cv::warpPerspective(img_right, tmp, PARAMS_.HOMO_SVC_RIGHT_, tmp.size(), cv::INTER_NEAREST);
         tmp.setTo(cv::Scalar(0,0,0), ipm_mask_svc_right_);
         ipm += tmp;
 
@@ -228,6 +221,12 @@ public:
             cv::imwrite(filepath.c_str(), img_right);
 #endif
         }
+    }
+
+    void AddCarTopview(cv::Mat& ipm_img, cv::Mat& car_top_img){
+        cv::Mat ipm_roi = ipm_img(cv::Rect(PARAMS_.CAR_MODEL_X0_, PARAMS_.CAR_MODEL_Y0_, PARAMS_.CAR_MODEL_W_, PARAMS_.CAR_MODEL_H_));
+        cv::Mat mask = cv::Mat::ones(PARAMS_.CAR_MODEL_H_, PARAMS_.CAR_MODEL_W_, CV_8UC1);
+        car_top_img.copyTo(ipm_roi, mask);
     }
 
     void PubIpmImage(const cv::Mat& img_ipm, const double t){
@@ -292,25 +291,25 @@ private:
 
         /* line_left_forward */
         float k_lf, b_lf;
-        GetKBFromTwoPoints(SVC_LEFT_X0, SVC_LEFT_Y0, 0.0f, R*BEV_H_, k_lf, b_lf);
+        GetKBFromTwoPoints(PARAMS_.SVC_LEFT_X0_, PARAMS_.SVC_LEFT_Y0_, 0.0f, R*PARAMS_.BEV_H_, k_lf, b_lf);
         /* line_right_forward */
         float k_rf, b_rf;
-        GetKBFromTwoPoints(SVC_RIGHT_X0, SVC_RIGHT_Y0, BEV_W_, R*BEV_H_, k_rf, b_rf);
+        GetKBFromTwoPoints(PARAMS_.SVC_RIGHT_X0_, PARAMS_.SVC_RIGHT_Y0_, PARAMS_.BEV_W_, R*PARAMS_.BEV_H_, k_rf, b_rf);
         /* line_left_rear */
         float k_lr, b_lr;
-        GetKBFromTwoPoints(SVC_LEFT_X0, SVC_LEFT_Y0, 0, (1.0f-R)*BEV_H_, k_lr, b_lr);
+        GetKBFromTwoPoints(PARAMS_.SVC_LEFT_X0_, PARAMS_.SVC_LEFT_Y0_, 0, (1.0f-R)*PARAMS_.BEV_H_, k_lr, b_lr);
         /* line_right_rear */
         float k_rr, b_rr;
-        GetKBFromTwoPoints(SVC_RIGHT_X0, SVC_RIGHT_Y0, BEV_W_, (1.0f-R)*BEV_H_, k_rr, b_rr);
+        GetKBFromTwoPoints(PARAMS_.SVC_RIGHT_X0_, PARAMS_.SVC_RIGHT_Y0_, PARAMS_.BEV_W_, (1.0f-R)*PARAMS_.BEV_H_, k_rr, b_rr);
 
-        for(int y=0; y<BEV_H_; y++){
-            for(int x=0; x<BEV_W_; x++){
+        for(int y=0; y<PARAMS_.BEV_H_; y++){
+            for(int x=0; x<PARAMS_.BEV_W_; x++){
                 float line_lf = k_lf*x + y + b_lf;
                 float line_rf = k_rf*x + y + b_rf;
                 float line_lr = k_lr*x + y + b_lr;
                 float line_rr = k_rr*x + y + b_rr;
                 /* svc_front area */
-                if(line_lf<=0.0f && line_rf<0.0f && y<SVC_FRONT_Y0){
+                if(line_lf<=0.0f && line_rf<0.0f && y<PARAMS_.SVC_FRONT_Y0_){
                     ipm_mask_svc_front_.at<uchar>(y, x) = 0;
                 }
                 /* svc_left area */
@@ -318,7 +317,7 @@ private:
                     ipm_mask_svc_left_.at<uchar>(y, x) = 0;
                 }
                 /* svc_rear area */
-                else if(line_lr>=0.0f && line_rr>0.0f && y>SVC_REAR_Y0){
+                else if(line_lr>=0.0f && line_rr>0.0f && y>PARAMS_.SVC_REAR_Y0_){
                     ipm_mask_svc_rear_.at<uchar>(y, x) = 0;
                 }
                 /* svc_right area */
@@ -344,29 +343,29 @@ private:
      */
     void GenIpmMasksBow1(){
         //ratio of width start-point, 0.0~0.5, 0.128 for w=640, 0.16 for w=1280
-        const float R = 0.128f;
+        const float R = 0.16f;
 
         /* line_left_forward */
         float k_lf, b_lf;
-        GetKBFromTwoPoints(SVC_LEFT_X0, SVC_LEFT_Y0, R*BEV_W_, 0.0f, k_lf, b_lf);
+        GetKBFromTwoPoints(PARAMS_.SVC_LEFT_X0_, PARAMS_.SVC_LEFT_Y0_, R*PARAMS_.BEV_W_, 0.0f, k_lf, b_lf);
         /* line_right_forward */
         float k_rf, b_rf;
-        GetKBFromTwoPoints(SVC_RIGHT_X0, SVC_RIGHT_Y0, (1.0f-R)*BEV_W_, 0.0f, k_rf, b_rf);
+        GetKBFromTwoPoints(PARAMS_.SVC_RIGHT_X0_, PARAMS_.SVC_RIGHT_Y0_, (1.0f-R)*PARAMS_.BEV_W_, 0.0f, k_rf, b_rf);
         /* line_left_rear */
         float k_lr, b_lr;
-        GetKBFromTwoPoints(SVC_LEFT_X0, SVC_LEFT_Y0, R*BEV_W_, BEV_H_, k_lr, b_lr);
+        GetKBFromTwoPoints(PARAMS_.SVC_LEFT_X0_, PARAMS_.SVC_LEFT_Y0_, R*PARAMS_.BEV_W_, PARAMS_.BEV_H_, k_lr, b_lr);
         /* line_right_rear */
         float k_rr, b_rr;
-        GetKBFromTwoPoints(SVC_RIGHT_X0, SVC_RIGHT_Y0, (1.0f-R)*BEV_W_, BEV_H_, k_rr, b_rr);
+        GetKBFromTwoPoints(PARAMS_.SVC_RIGHT_X0_, PARAMS_.SVC_RIGHT_Y0_, (1.0f-R)*PARAMS_.BEV_W_, PARAMS_.BEV_H_, k_rr, b_rr);
 
-        for(int y=0; y<BEV_H_; y++){
-            for(int x=0; x<BEV_W_; x++){
+        for(int y=0; y<PARAMS_.BEV_H_; y++){
+            for(int x=0; x<PARAMS_.BEV_W_; x++){
                 float line_lf = k_lf*x + y + b_lf;
                 float line_rf = k_rf*x + y + b_rf;
                 float line_lr = k_lr*x + y + b_lr;
                 float line_rr = k_rr*x + y + b_rr;
                 /* svc_front area */
-                if(line_lf<=0.0f && line_rf<0.0f && y<SVC_FRONT_Y0){
+                if(line_lf<=0.0f && line_rf<0.0f && y<PARAMS_.SVC_FRONT_Y0_){
                     ipm_mask_svc_front_.at<uchar>(y, x) = 0;
                 }
                 /* svc_left area */
@@ -374,7 +373,7 @@ private:
                     ipm_mask_svc_left_.at<uchar>(y, x) = 0;
                 }
                 /* svc_rear area */
-                else if(line_lr>=0.0f && line_rr>0.0f && y>SVC_REAR_Y0){
+                else if(line_lr>=0.0f && line_rr>0.0f && y>PARAMS_.SVC_REAR_Y0_){
                     ipm_mask_svc_rear_.at<uchar>(y, x) = 0;
                 }
                 /* svc_right area */
@@ -400,13 +399,13 @@ private:
       line2-(w, 0)-(0, h): BEV_H_/BEV_W_*x + y - BEV_H_ = 0
      */
     void GenIpmMasksOrtho(){
-        const float k1 = -1*BEV_H_/(float)BEV_W_;
+        const float k1 = -1*PARAMS_.BEV_H_/(float)PARAMS_.BEV_W_;
         const float b1 = 0.0f;
-        const float k2 = BEV_H_/(float)BEV_W_;
-        const float b2 = -1 * BEV_H_;
+        const float k2 = PARAMS_.BEV_H_/(float)PARAMS_.BEV_W_;
+        const float b2 = -1 * PARAMS_.BEV_H_;
 
-        for(int y=0; y<BEV_H_; y++){
-            for(int x=0; x<BEV_W_; x++){
+        for(int y=0; y<PARAMS_.BEV_H_; y++){
+            for(int x=0; x<PARAMS_.BEV_W_; x++){
                 float line1 = k1*x + y + b1;
                 float line2 = k2*x + y + b2;
                 /* svc_front area */
@@ -437,15 +436,15 @@ private:
 
     /* only reserve positive half */
     void GenIpmMasksHalf(){
-        for(int y=0; y<BEV_H_; y++){
-            for(int x=0; x<BEV_W_; x++){
-                if(x > BEV_W_/2){
+        for(int y=0; y<PARAMS_.BEV_H_; y++){
+            for(int x=0; x<PARAMS_.BEV_W_; x++){
+                if(x > PARAMS_.BEV_W_/2){
                     ipm_mask_svc_right_.at<uchar>(y, x) = 0;
                 }else{
                     ipm_mask_svc_left_.at<uchar>(y, x) = 0;
                 }
 
-                if(y > BEV_H_/2){
+                if(y > PARAMS_.BEV_H_/2){
                     ipm_mask_svc_rear_.at<uchar>(y, x) = 0;
                 }else{
                     ipm_mask_svc_front_.at<uchar>(y, x) = 0;

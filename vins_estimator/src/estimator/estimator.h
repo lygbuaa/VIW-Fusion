@@ -39,7 +39,7 @@
 #include "../factor/projectionOneFrameTwoCamFactor.h"
 #include "../featureTracker/feature_tracker.h"
 #include "viwo_utils.h"
-#include "ipm_composer.h"
+// #include "ipm_composer.h"
 
 class Estimator
 {

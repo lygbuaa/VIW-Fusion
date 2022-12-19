@@ -1,3 +1,7 @@
+# run apa node
+1. `roslaunch apa_node apa_carla.launch`
+2. `rosbag play data/apa_town04_opt_microlino_20221219.bag`
+
 # run svc application
 1. `roslaunch vins svc_carla.launch`
 2. `rosbag play data/avp_town04_20220927.bag` 

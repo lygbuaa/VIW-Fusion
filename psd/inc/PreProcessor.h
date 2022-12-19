@@ -4,6 +4,7 @@
 #include <dirent.h>
 #include <libgen.h>
 #include <chrono>
+#include "viwo_utils.h"
 
 namespace psdonnx
 {
