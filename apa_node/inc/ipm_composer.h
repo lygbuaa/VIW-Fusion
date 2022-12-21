@@ -36,15 +36,16 @@ typedef struct{
     double z=0.0f;
     double pitch=0.0f;
     double roll=0.0f;
+    double yaw=0.0f;
 } SvcPairedImages_t;
 
 class IpmComposer
 {
 public:
-    IPM_PARAMS_t PARAMS_;
     static constexpr float DT_THRESHOLD_SEC_ = 0.02f;
     static constexpr int BUFFER_MAX_ = 10;
     static constexpr double PI_ = 3.141592741;
+    std::shared_ptr<CvParamLoader> cpl_;
 
 private:
     ros::Publisher pub_image_ipm_;
@@ -73,38 +74,39 @@ public:
         svc_bufs_[SvcIndex_t::REAR] = svc_rear_buf_ptr_;
         svc_bufs_[SvcIndex_t::RIGHT] = svc_right_buf_ptr_;
 
-        PARAMS_.HOMO_SVC_FRONT_ = cv::Mat::eye(3, 3, CV_32F);
-        PARAMS_.HOMO_SVC_LEFT_ = cv::Mat::eye(3, 3, CV_32F);
-        PARAMS_.HOMO_SVC_REAR_ = cv::Mat::eye(3, 3, CV_32F);
-        PARAMS_.HOMO_SVC_RIGHT_ = cv::Mat::eye(3, 3, CV_32F);
+        // g_params_.HOMO_SVC_FRONT_ = cv::Mat::eye(3, 3, CV_32F);
+        // g_params_.HOMO_SVC_LEFT_ = cv::Mat::eye(3, 3, CV_32F);
+        // g_params_.HOMO_SVC_REAR_ = cv::Mat::eye(3, 3, CV_32F);
+        // g_params_.HOMO_SVC_RIGHT_ = cv::Mat::eye(3, 3, CV_32F);
 
-        ipm_mask_svc_front_ = cv::Mat::ones(PARAMS_.BEV_H_, PARAMS_.BEV_W_, CV_8UC1);
-        ipm_mask_svc_left_ = cv::Mat::ones(PARAMS_.BEV_H_, PARAMS_.BEV_W_, CV_8UC1);
-        ipm_mask_svc_rear_ = cv::Mat::ones(PARAMS_.BEV_H_, PARAMS_.BEV_W_, CV_8UC1);
-        ipm_mask_svc_right_ = cv::Mat::ones(PARAMS_.BEV_H_, PARAMS_.BEV_W_, CV_8UC1);
+        ipm_mask_svc_front_ = cv::Mat::ones(g_params_.BEV_H_, g_params_.BEV_W_, CV_8UC1);
+        ipm_mask_svc_left_ = cv::Mat::ones(g_params_.BEV_H_, g_params_.BEV_W_, CV_8UC1);
+        ipm_mask_svc_rear_ = cv::Mat::ones(g_params_.BEV_H_, g_params_.BEV_W_, CV_8UC1);
+        ipm_mask_svc_right_ = cv::Mat::ones(g_params_.BEV_H_, g_params_.BEV_W_, CV_8UC1);
     }
 
     ~IpmComposer() {}
 
-    void SetParams(IPM_PARAMS_t params){
-        PARAMS_ = params;
-        ROS_INFO("PARAMS_.HOMO_SVC_FRONT_: %s\n", ViwoUtils::CvMat2Str(PARAMS_.HOMO_SVC_FRONT_).c_str());
-        ROS_INFO("PARAMS_.HOMO_SVC_LEFT_: %s\n", ViwoUtils::CvMat2Str(PARAMS_.HOMO_SVC_LEFT_).c_str());
-        ROS_INFO("PARAMS_.HOMO_SVC_REAR_: %s\n", ViwoUtils::CvMat2Str(PARAMS_.HOMO_SVC_REAR_).c_str());
-        ROS_INFO("PARAMS_.HOMO_SVC_RIGHT_: %s\n", ViwoUtils::CvMat2Str(PARAMS_.HOMO_SVC_RIGHT_).c_str());
+    void InitParams(std::shared_ptr<CvParamLoader> cpl){
+        cpl_ = cpl;
+        ROS_INFO("g_params_.HOMO_SVC_FRONT_: %s\n", ViwoUtils::CvMat2Str(g_params_.HOMO_SVC_FRONT_).c_str());
+        ROS_INFO("g_params_.HOMO_SVC_LEFT_: %s\n", ViwoUtils::CvMat2Str(g_params_.HOMO_SVC_LEFT_).c_str());
+        ROS_INFO("g_params_.HOMO_SVC_REAR_: %s\n", ViwoUtils::CvMat2Str(g_params_.HOMO_SVC_REAR_).c_str());
+        ROS_INFO("g_params_.HOMO_SVC_RIGHT_: %s\n", ViwoUtils::CvMat2Str(g_params_.HOMO_SVC_RIGHT_).c_str());
         GenIpmMasksBow1();
+        ReadCarModel(cpl_->car_top_image_path_);
     }
 
     bool ReadCarModel(std::string car_img_path){
         cv::Mat car_top_view = cv::imread(car_img_path, cv::IMREAD_COLOR);
         float h_w_ration = (float)car_top_view.rows / car_top_view.cols;
-        PARAMS_.CAR_MODEL_W_ = int(PARAMS_.SVC_RIGHT_X0_ - PARAMS_.SVC_LEFT_X0_) + 10;
-        // PARAMS_.CAR_MODEL_H_ = int(PARAMS_.SVC_REAR_Y0_ - PARAMS_.SVC_FRONT_Y0_) + 2;
-        PARAMS_.CAR_MODEL_H_ = int(PARAMS_.CAR_MODEL_W_ * h_w_ration);
-        car_top_view_ = psdonnx::PreProcessor::resize(car_top_view, PARAMS_.CAR_MODEL_W_, PARAMS_.CAR_MODEL_H_);
-        PARAMS_.CAR_MODEL_X0_ = (PARAMS_.BEV_W_-PARAMS_.CAR_MODEL_W_)/2 - 1;
-        PARAMS_.CAR_MODEL_Y0_ = (PARAMS_.BEV_H_-PARAMS_.CAR_MODEL_H_)/2 - 1;
-        ROS_INFO("car model x: %d, y: %d, w: %d, h: %d\n", PARAMS_.CAR_MODEL_X0_, PARAMS_.CAR_MODEL_Y0_, PARAMS_.CAR_MODEL_W_, PARAMS_.CAR_MODEL_H_);
+        g_params_.CAR_MODEL_W_ = int(g_params_.SVC_RIGHT_X0_ - g_params_.SVC_LEFT_X0_) + 40;
+        // g_params_.CAR_MODEL_H_ = int(g_params_.SVC_REAR_Y0_ - g_params_.SVC_FRONT_Y0_) + 2;
+        g_params_.CAR_MODEL_H_ = int(g_params_.CAR_MODEL_W_ * h_w_ration);
+        car_top_view_ = psdonnx::PreProcessor::resize(car_top_view, g_params_.CAR_MODEL_W_, g_params_.CAR_MODEL_H_);
+        g_params_.CAR_MODEL_X0_ = (g_params_.BEV_W_-g_params_.CAR_MODEL_W_)/2 - 1;
+        g_params_.CAR_MODEL_Y0_ = (g_params_.BEV_H_-g_params_.CAR_MODEL_H_)/2 - 1;
+        ROS_INFO("car model x: %d, y: %d, w: %d, h: %d\n", g_params_.CAR_MODEL_X0_, g_params_.CAR_MODEL_Y0_, g_params_.CAR_MODEL_W_, g_params_.CAR_MODEL_H_);
         return true;
     }
 
@@ -182,29 +184,34 @@ public:
                 continue;
             }else if(t > paired_images.time+DT_THRESHOLD_SEC_){
                 ROS_ERROR("impossisble, image time: %f, odom time: %f", paired_images.time, t);
+                break;
             }else{
-                auto tmp_Q = odom_msg->pose.pose.orientation;
+                /* eigen.eulerAngles() don't match tramsform3d.euler2quat(), use carla.rpy directly. */
+                // auto tmp_Q = odom_msg->pose.pose.orientation;
                 auto tmp_T = odom_msg->pose.pose.position;
-                Eigen::Quaterniond quat = Eigen::Quaterniond(tmp_Q.w, tmp_Q.x, tmp_Q.y, tmp_Q.z);
+                auto cov = odom_msg->pose.covariance;
+                // Eigen::Quaterniond quat = Eigen::Quaterniond(tmp_Q.w, tmp_Q.x, tmp_Q.y, tmp_Q.z);
                 // 0-z-yaw, 1-x-roll, 2-y-pitch
-                Eigen::Vector3d euler = quat.toRotationMatrix().eulerAngles(2, 0, 1);
-                paired_images.roll = euler[1];
-                if(paired_images.roll>PI_/2.0){
-                    paired_images.roll -= PI_;
-                }else if(paired_images.roll<-1*PI_/2.0){
-                    paired_images.roll += PI_;
-                }
-                paired_images.pitch = euler[2];
-                if(paired_images.pitch>PI_/2.0){
-                    paired_images.pitch -= PI_;
-                }else if(paired_images.pitch<-1*PI_/2.0){
-                    paired_images.pitch += PI_;
-                }
+                // Eigen::Vector3d euler = quat.toRotationMatrix().eulerAngles(2, 0, 1);
+                paired_images.roll = -1*cov[0];//euler[1]; //-1*tmp_Q.x*2;
+                // if(paired_images.roll>PI_/2.0){
+                //     paired_images.roll -= PI_;
+                // }else if(paired_images.roll<-1*PI_/2.0){
+                //     paired_images.roll += PI_;
+                // }
+                paired_images.pitch = cov[1];//euler[2]; //tmp_Q.y*2;
+                // if(paired_images.pitch>PI_/2.0){
+                //     paired_images.pitch -= PI_;
+                // }else if(paired_images.pitch<-1*PI_/2.0){
+                //     paired_images.pitch += PI_;
+                // }
+                paired_images.yaw = cov[2];//euler[0]; //tmp_Q.z*2;
+
                 Eigen::Vector3d loc = Eigen::Vector3d(tmp_T.x, tmp_T.y, tmp_T.z);
                 paired_images.x = loc[0];
                 paired_images.y = loc[1];
                 paired_images.z = loc[2];
-                ROS_INFO("sync image time: %f, odom time: %f", paired_images.time, t);
+                ROS_INFO("sync image time: %f, odom time: %f, cov: %.2f, %.2f, %.2f, %.2f", paired_images.time, t, cov[0], cov[1], cov[2], cov[3]);
                 break;
             }
         }
@@ -218,29 +225,33 @@ public:
         const cv::Mat& img_right = pis.img_right;
         cv::Mat& ipm = pis.img_ipm;
 
-        ipm = cv::Mat::zeros(PARAMS_.BEV_H_, PARAMS_.BEV_W_, CV_8UC3);
-        cv::Mat tmp(PARAMS_.BEV_H_, PARAMS_.BEV_W_, CV_8UC3);
-        cv::warpPerspective(img_front, tmp, PARAMS_.HOMO_SVC_FRONT_, tmp.size(), cv::INTER_NEAREST);
+        cpl_ -> update_homo(pis.pitch, pis.roll, 0.0);
+
+        ipm = cv::Mat::zeros(g_params_.BEV_H_, g_params_.BEV_W_, CV_8UC3);
+        cv::Mat tmp(g_params_.BEV_H_, g_params_.BEV_W_, CV_8UC3);
+        cv::warpPerspective(img_front, tmp, g_params_.HOMO_SVC_FRONT_, tmp.size(), cv::INTER_NEAREST);
         tmp.setTo(cv::Scalar(0,0,0), ipm_mask_svc_front_);
         ipm += tmp;
 
-        cv::warpPerspective(img_left, tmp, PARAMS_.HOMO_SVC_LEFT_, tmp.size(), cv::INTER_NEAREST);
+        cv::warpPerspective(img_left, tmp, g_params_.HOMO_SVC_LEFT_, tmp.size(), cv::INTER_NEAREST);
         tmp.setTo(cv::Scalar(0,0,0), ipm_mask_svc_left_);
         ipm += tmp;
 
-        cv::warpPerspective(img_rear, tmp, PARAMS_.HOMO_SVC_REAR_, tmp.size(), cv::INTER_NEAREST);
+        cv::warpPerspective(img_rear, tmp, g_params_.HOMO_SVC_REAR_, tmp.size(), cv::INTER_NEAREST);
         tmp.setTo(cv::Scalar(0,0,0), ipm_mask_svc_rear_);
         ipm += tmp;
 
-        cv::warpPerspective(img_right, tmp, PARAMS_.HOMO_SVC_RIGHT_, tmp.size(), cv::INTER_NEAREST);
+        cv::warpPerspective(img_right, tmp, g_params_.HOMO_SVC_RIGHT_, tmp.size(), cv::INTER_NEAREST);
         tmp.setTo(cv::Scalar(0,0,0), ipm_mask_svc_right_);
         ipm += tmp;
 
-        char tmpstr[64] = {0};
-        sprintf(tmpstr, "rpxyz: %.2f, %.2f, %.2f, %.2f, %.2f", pis.roll*57.3, pis.pitch*57.3, pis.x, pis.y, pis.z);
-        cv::Point org(10, 20);
-        cv::Scalar yellow(0, 255, 255);
-        cv::putText(ipm, tmpstr, org, cv::FONT_HERSHEY_DUPLEX, 0.6, yellow, 1);
+        AddCarTopview(ipm, car_top_view_);
+
+        // char tmpstr[64] = {0};
+        // sprintf(tmpstr, "rpy: %.2f, %.2f, %.2f", pis.roll*57.3, pis.pitch*57.3, pis.yaw*57.3);
+        // cv::Point org(10, 20);
+        // cv::Scalar yellow(0, 255, 255);
+        // cv::putText(ipm, tmpstr, org, cv::FONT_HERSHEY_DUPLEX, 0.6, yellow, 1);
 
         PubIpmImage(ipm, pis.time);
 
@@ -265,8 +276,8 @@ public:
     }
 
     void AddCarTopview(cv::Mat& ipm_img, cv::Mat& car_top_img){
-        cv::Mat ipm_roi = ipm_img(cv::Rect(PARAMS_.CAR_MODEL_X0_, PARAMS_.CAR_MODEL_Y0_, PARAMS_.CAR_MODEL_W_, PARAMS_.CAR_MODEL_H_));
-        cv::Mat mask = cv::Mat::ones(PARAMS_.CAR_MODEL_H_, PARAMS_.CAR_MODEL_W_, CV_8UC1);
+        cv::Mat ipm_roi = ipm_img(cv::Rect(g_params_.CAR_MODEL_X0_, g_params_.CAR_MODEL_Y0_, g_params_.CAR_MODEL_W_, g_params_.CAR_MODEL_H_));
+        cv::Mat mask = cv::Mat::ones(g_params_.CAR_MODEL_H_, g_params_.CAR_MODEL_W_, CV_8UC1);
         car_top_img.copyTo(ipm_roi, mask);
     }
 
@@ -332,25 +343,25 @@ private:
 
         /* line_left_forward */
         float k_lf, b_lf;
-        GetKBFromTwoPoints(PARAMS_.SVC_LEFT_X0_, PARAMS_.SVC_LEFT_Y0_, 0.0f, R*PARAMS_.BEV_H_, k_lf, b_lf);
+        GetKBFromTwoPoints(g_params_.SVC_LEFT_X0_, g_params_.SVC_LEFT_Y0_, 0.0f, R*g_params_.BEV_H_, k_lf, b_lf);
         /* line_right_forward */
         float k_rf, b_rf;
-        GetKBFromTwoPoints(PARAMS_.SVC_RIGHT_X0_, PARAMS_.SVC_RIGHT_Y0_, PARAMS_.BEV_W_, R*PARAMS_.BEV_H_, k_rf, b_rf);
+        GetKBFromTwoPoints(g_params_.SVC_RIGHT_X0_, g_params_.SVC_RIGHT_Y0_, g_params_.BEV_W_, R*g_params_.BEV_H_, k_rf, b_rf);
         /* line_left_rear */
         float k_lr, b_lr;
-        GetKBFromTwoPoints(PARAMS_.SVC_LEFT_X0_, PARAMS_.SVC_LEFT_Y0_, 0, (1.0f-R)*PARAMS_.BEV_H_, k_lr, b_lr);
+        GetKBFromTwoPoints(g_params_.SVC_LEFT_X0_, g_params_.SVC_LEFT_Y0_, 0, (1.0f-R)*g_params_.BEV_H_, k_lr, b_lr);
         /* line_right_rear */
         float k_rr, b_rr;
-        GetKBFromTwoPoints(PARAMS_.SVC_RIGHT_X0_, PARAMS_.SVC_RIGHT_Y0_, PARAMS_.BEV_W_, (1.0f-R)*PARAMS_.BEV_H_, k_rr, b_rr);
+        GetKBFromTwoPoints(g_params_.SVC_RIGHT_X0_, g_params_.SVC_RIGHT_Y0_, g_params_.BEV_W_, (1.0f-R)*g_params_.BEV_H_, k_rr, b_rr);
 
-        for(int y=0; y<PARAMS_.BEV_H_; y++){
-            for(int x=0; x<PARAMS_.BEV_W_; x++){
+        for(int y=0; y<g_params_.BEV_H_; y++){
+            for(int x=0; x<g_params_.BEV_W_; x++){
                 float line_lf = k_lf*x + y + b_lf;
                 float line_rf = k_rf*x + y + b_rf;
                 float line_lr = k_lr*x + y + b_lr;
                 float line_rr = k_rr*x + y + b_rr;
                 /* svc_front area */
-                if(line_lf<=0.0f && line_rf<0.0f && y<PARAMS_.SVC_FRONT_Y0_){
+                if(line_lf<=0.0f && line_rf<0.0f && y<g_params_.SVC_FRONT_Y0_){
                     ipm_mask_svc_front_.at<uchar>(y, x) = 0;
                 }
                 /* svc_left area */
@@ -358,7 +369,7 @@ private:
                     ipm_mask_svc_left_.at<uchar>(y, x) = 0;
                 }
                 /* svc_rear area */
-                else if(line_lr>=0.0f && line_rr>0.0f && y>PARAMS_.SVC_REAR_Y0_){
+                else if(line_lr>=0.0f && line_rr>0.0f && y>g_params_.SVC_REAR_Y0_){
                     ipm_mask_svc_rear_.at<uchar>(y, x) = 0;
                 }
                 /* svc_right area */
@@ -388,25 +399,25 @@ private:
 
         /* line_left_forward */
         float k_lf, b_lf;
-        GetKBFromTwoPoints(PARAMS_.SVC_LEFT_X0_, PARAMS_.SVC_LEFT_Y0_, R*PARAMS_.BEV_W_, 0.0f, k_lf, b_lf);
+        GetKBFromTwoPoints(g_params_.SVC_LEFT_X0_, g_params_.SVC_LEFT_Y0_, R*g_params_.BEV_W_, 0.0f, k_lf, b_lf);
         /* line_right_forward */
         float k_rf, b_rf;
-        GetKBFromTwoPoints(PARAMS_.SVC_RIGHT_X0_, PARAMS_.SVC_RIGHT_Y0_, (1.0f-R)*PARAMS_.BEV_W_, 0.0f, k_rf, b_rf);
+        GetKBFromTwoPoints(g_params_.SVC_RIGHT_X0_, g_params_.SVC_RIGHT_Y0_, (1.0f-R)*g_params_.BEV_W_, 0.0f, k_rf, b_rf);
         /* line_left_rear */
         float k_lr, b_lr;
-        GetKBFromTwoPoints(PARAMS_.SVC_LEFT_X0_, PARAMS_.SVC_LEFT_Y0_, R*PARAMS_.BEV_W_, PARAMS_.BEV_H_, k_lr, b_lr);
+        GetKBFromTwoPoints(g_params_.SVC_LEFT_X0_, g_params_.SVC_LEFT_Y0_, R*g_params_.BEV_W_, g_params_.BEV_H_, k_lr, b_lr);
         /* line_right_rear */
         float k_rr, b_rr;
-        GetKBFromTwoPoints(PARAMS_.SVC_RIGHT_X0_, PARAMS_.SVC_RIGHT_Y0_, (1.0f-R)*PARAMS_.BEV_W_, PARAMS_.BEV_H_, k_rr, b_rr);
+        GetKBFromTwoPoints(g_params_.SVC_RIGHT_X0_, g_params_.SVC_RIGHT_Y0_, (1.0f-R)*g_params_.BEV_W_, g_params_.BEV_H_, k_rr, b_rr);
 
-        for(int y=0; y<PARAMS_.BEV_H_; y++){
-            for(int x=0; x<PARAMS_.BEV_W_; x++){
+        for(int y=0; y<g_params_.BEV_H_; y++){
+            for(int x=0; x<g_params_.BEV_W_; x++){
                 float line_lf = k_lf*x + y + b_lf;
                 float line_rf = k_rf*x + y + b_rf;
                 float line_lr = k_lr*x + y + b_lr;
                 float line_rr = k_rr*x + y + b_rr;
                 /* svc_front area */
-                if(line_lf<=0.0f && line_rf<0.0f && y<PARAMS_.SVC_FRONT_Y0_){
+                if(line_lf<=0.0f && line_rf<0.0f && y<g_params_.SVC_FRONT_Y0_){
                     ipm_mask_svc_front_.at<uchar>(y, x) = 0;
                 }
                 /* svc_left area */
@@ -414,7 +425,7 @@ private:
                     ipm_mask_svc_left_.at<uchar>(y, x) = 0;
                 }
                 /* svc_rear area */
-                else if(line_lr>=0.0f && line_rr>0.0f && y>PARAMS_.SVC_REAR_Y0_){
+                else if(line_lr>=0.0f && line_rr>0.0f && y>g_params_.SVC_REAR_Y0_){
                     ipm_mask_svc_rear_.at<uchar>(y, x) = 0;
                 }
                 /* svc_right area */
@@ -440,13 +451,13 @@ private:
       line2-(w, 0)-(0, h): BEV_H_/BEV_W_*x + y - BEV_H_ = 0
      */
     void GenIpmMasksOrtho(){
-        const float k1 = -1*PARAMS_.BEV_H_/(float)PARAMS_.BEV_W_;
+        const float k1 = -1*g_params_.BEV_H_/(float)g_params_.BEV_W_;
         const float b1 = 0.0f;
-        const float k2 = PARAMS_.BEV_H_/(float)PARAMS_.BEV_W_;
-        const float b2 = -1 * PARAMS_.BEV_H_;
+        const float k2 = g_params_.BEV_H_/(float)g_params_.BEV_W_;
+        const float b2 = -1 * g_params_.BEV_H_;
 
-        for(int y=0; y<PARAMS_.BEV_H_; y++){
-            for(int x=0; x<PARAMS_.BEV_W_; x++){
+        for(int y=0; y<g_params_.BEV_H_; y++){
+            for(int x=0; x<g_params_.BEV_W_; x++){
                 float line1 = k1*x + y + b1;
                 float line2 = k2*x + y + b2;
                 /* svc_front area */
@@ -477,15 +488,15 @@ private:
 
     /* only reserve positive half */
     void GenIpmMasksHalf(){
-        for(int y=0; y<PARAMS_.BEV_H_; y++){
-            for(int x=0; x<PARAMS_.BEV_W_; x++){
-                if(x > PARAMS_.BEV_W_/2){
+        for(int y=0; y<g_params_.BEV_H_; y++){
+            for(int x=0; x<g_params_.BEV_W_; x++){
+                if(x > g_params_.BEV_W_/2){
                     ipm_mask_svc_right_.at<uchar>(y, x) = 0;
                 }else{
                     ipm_mask_svc_left_.at<uchar>(y, x) = 0;
                 }
 
-                if(y > PARAMS_.BEV_H_/2){
+                if(y > g_params_.BEV_H_/2){
                     ipm_mask_svc_rear_.at<uchar>(y, x) = 0;
                 }else{
                     ipm_mask_svc_front_.at<uchar>(y, x) = 0;

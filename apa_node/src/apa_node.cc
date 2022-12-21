@@ -26,12 +26,14 @@
 #include "CvParamLoader.h"
 #include "ipm_composer.h"
 
+IPM_PARAMS_t g_params_;
 std::queue<sensor_msgs::ImuConstPtr> imu_buf_;
 std::mutex m_buf_;
 std::unique_ptr<IpmComposer> g_ipm_composer_;
 std::unique_ptr<psdonnx::PsdWrapper> g_psd_wrapper_;
 std::unique_ptr<psdonnx::JsonDataset> g_json_dataset_;
-std::unique_ptr<CvParamLoader> g_param_loader_;
+std::shared_ptr<CvParamLoader> g_param_loader_;
+bool g_exit_ = false;
 
 void img_front_callback(const sensor_msgs::ImageConstPtr &img_msg)
 {
@@ -95,7 +97,7 @@ void sync_process()
     cv::Mat image_front, image_left, image_rear, image_right, image_ipm;
     double last_time = 0.0f;
     SvcPairedImages_t pis;
-    while(true)
+    while(!g_exit_)
     {
         std_msgs::Header header;
         double time = -1.0f;
@@ -181,10 +183,10 @@ int main(int argc, char **argv)
 #endif
 
     // registerPub(n);
-    g_param_loader_ = std::unique_ptr<CvParamLoader> (new CvParamLoader(config_file_path));
+    g_param_loader_ = std::shared_ptr<CvParamLoader> (new CvParamLoader(config_file_path));
     g_ipm_composer_ = std::unique_ptr<IpmComposer>(new IpmComposer());
     g_ipm_composer_ -> InitIpmPub(n);
-    g_ipm_composer_ -> SetParams(g_param_loader_->ipm_params_);
+    g_ipm_composer_ -> InitParams(g_param_loader_);
     g_ipm_composer_ -> ReadCarModel(g_param_loader_->car_top_image_path_);
     // g_ipm_composer_ -> SetHomography(HOMO_SVC_FRONT_, HOMO_SVC_LEFT_, HOMO_SVC_REAR_, HOMO_SVC_RIGHT_);
     // g_psd_wrapper_ = std::unique_ptr<psdonnx::PsdWrapper>(new psdonnx::PsdWrapper());
@@ -202,5 +204,7 @@ int main(int argc, char **argv)
     ros::Subscriber sub_wheel = n.subscribe(g_param_loader_->wheel_topic_, 100, wheel_callback, ros::TransportHints().tcpNoDelay());
     std::thread sync_thread{sync_process};
     ros::spin();
+    g_exit_ = true;
+    sync_thread.join();
     return 0;
 }
