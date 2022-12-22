@@ -20,14 +20,14 @@
 #include "estimator/estimator.h"
 #include "estimator/parameters.h"
 #include "utility/visualization.h"
-#include "PsdWrapper.h"
+#include "DmprWrapper.h"
 
 Estimator estimator;
 
 std::queue<sensor_msgs::ImuConstPtr> imu_buf_;
 std::mutex m_buf_;
 std::unique_ptr<IpmComposer> g_ipm_composer_;
-std::unique_ptr<psdonnx::PsdWrapper> g_psd_wrapper_;
+std::unique_ptr<psdonnx::DmprWrapper> g_psd_wrapper_;
 
 void img_front_callback(const sensor_msgs::ImageConstPtr &img_msg)
 {
@@ -200,7 +200,7 @@ int main(int argc, char **argv)
     g_ipm_composer_ = std::unique_ptr<IpmComposer>(new IpmComposer());
     g_ipm_composer_ -> InitIpmPub(n);
     g_ipm_composer_ -> SetHomography(HOMO_SVC_FRONT_, HOMO_SVC_LEFT_, HOMO_SVC_REAR_, HOMO_SVC_RIGHT_);
-    g_psd_wrapper_ = std::unique_ptr<psdonnx::PsdWrapper>(new psdonnx::PsdWrapper());
+    g_psd_wrapper_ = std::unique_ptr<psdonnx::DmprWrapper>(new psdonnx::DmprWrapper());
     g_psd_wrapper_ -> load_model(PCR_MODEL_PATH, PSD_MODEL_PATH);
 
     ros::Subscriber sub_img_front = n.subscribe(IMAGE_FRONT_TOPIC, 100, img_front_callback);

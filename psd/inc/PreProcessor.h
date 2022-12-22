@@ -123,7 +123,8 @@ public:
         }
     }
 
-    static void dmpr_preprocess(cv::Mat& img, const size_t h, const size_t w, std::vector<float>& output){
+    static void dmpr_preprocess(const cv::Mat& img, const size_t h, const size_t w, std::vector<float>& output){
+        HANG_STOPWATCH();
         const size_t c = img.channels();
         std::vector<float> vec_hwc(normalize(resize(img, w, h)).reshape(1, 1));
         hwc2chw(vec_hwc, h, w, c, output);

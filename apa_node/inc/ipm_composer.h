@@ -245,15 +245,14 @@ public:
         tmp.setTo(cv::Scalar(0,0,0), ipm_mask_svc_right_);
         ipm += tmp;
 
-        AddCarTopview(ipm, car_top_view_);
-
-        // char tmpstr[64] = {0};
-        // sprintf(tmpstr, "rpy: %.2f, %.2f, %.2f", pis.roll*57.3, pis.pitch*57.3, pis.yaw*57.3);
-        // cv::Point org(10, 20);
-        // cv::Scalar yellow(0, 255, 255);
+        char tmpstr[64] = {0};
+        sprintf(tmpstr, "rxyz: %.1f, %.2f, %.2f, %.2f", pis.yaw*57.3, pis.x, pis.y, pis.z);
+        cv::Point org(10, 20);
+        cv::Scalar yellow(0, 255, 255);
         // cv::putText(ipm, tmpstr, org, cv::FONT_HERSHEY_DUPLEX, 0.6, yellow, 1);
+        ROS_INFO("carla rxyz: %s", tmpstr);
 
-        PubIpmImage(ipm, pis.time);
+        // PubIpmImage(ipm, pis.time);
 
         if(debug_save){
             std::string tstr = std::to_string(pis.time);
@@ -281,7 +280,8 @@ public:
         car_top_img.copyTo(ipm_roi, mask);
     }
 
-    void PubIpmImage(const cv::Mat& img_ipm, const double t){
+    void PubIpmImage(cv::Mat& img_ipm, const double t){
+        AddCarTopview(img_ipm, car_top_view_);
         std_msgs::Header header;
         header.frame_id = "world";
         header.stamp = ros::Time(t);

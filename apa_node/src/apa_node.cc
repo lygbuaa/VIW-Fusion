@@ -21,7 +21,7 @@
 #include <sensor_msgs/Imu.h>
 #include <nav_msgs/Odometry.h>
 #include <opencv2/opencv.hpp>
-#include "PsdWrapper.h"
+#include "DmprWrapper.h"
 #include "JsonDataset.h"
 #include "CvParamLoader.h"
 #include "ipm_composer.h"
@@ -30,7 +30,7 @@ IPM_PARAMS_t g_params_;
 std::queue<sensor_msgs::ImuConstPtr> imu_buf_;
 std::mutex m_buf_;
 std::unique_ptr<IpmComposer> g_ipm_composer_;
-std::unique_ptr<psdonnx::PsdWrapper> g_psd_wrapper_;
+std::unique_ptr<psdonnx::DmprWrapper> g_dmpr_wrapper_;
 std::unique_ptr<psdonnx::JsonDataset> g_json_dataset_;
 std::shared_ptr<CvParamLoader> g_param_loader_;
 bool g_exit_ = false;
@@ -117,8 +117,8 @@ void sync_process()
                 //     g_ipm_composer_ -> PopImage(SvcIndex_t::ALL);
                 //     continue;
                 // }
-                g_ipm_composer_ -> Compose(pis, true, g_param_loader_->output_path_);
-                // g_ipm_composer_ -> Compose(pis, false);
+                // g_ipm_composer_ -> Compose(pis, true, g_param_loader_->output_path_);
+                g_ipm_composer_ -> Compose(pis, false);
 		        // g_json_dataset_ -> feed(pis.time, pis.img_front, pis.img_left, pis.img_right, pis.img_rear);
                 g_ipm_composer_ -> PopImage(SvcIndex_t::ALL);
                 // ROS_INFO("get sync images, ts_front: %f", time);
@@ -130,10 +130,11 @@ void sync_process()
             /* send paired images into estimator */
             //estimator.inputImage(time, image0, image1);
             time = -1.0f;
-	        // psdonnx::Detections_t det;
-	        // std::string psd_save_path = OUTPUT_FOLDER + "/" + std::to_string(pis.time) + "_psd.png";
-	        //g_psd_wrapper_ -> run_model(pis.img_ipm, det, true, psd_save_path);
-	        // g_psd_wrapper_ -> run_model(pis.img_ipm, det);
+	        psdonnx::Detections_t det;
+	        std::string psd_save_path = g_param_loader_->output_path_ + "/" + std::to_string(pis.time) + "_psd.png";
+	        // g_dmpr_wrapper_ -> run_model(pis.img_ipm, det, true, psd_save_path);
+	        g_dmpr_wrapper_ -> run_model(pis.img_ipm, det, true);
+            g_ipm_composer_ -> PubIpmImage(pis.img_ipm, pis.time);
         }
 
         std::chrono::milliseconds dura(5);
@@ -188,10 +189,11 @@ int main(int argc, char **argv)
     g_ipm_composer_ -> InitIpmPub(n);
     g_ipm_composer_ -> InitParams(g_param_loader_);
     g_ipm_composer_ -> ReadCarModel(g_param_loader_->car_top_image_path_);
-    // g_ipm_composer_ -> SetHomography(HOMO_SVC_FRONT_, HOMO_SVC_LEFT_, HOMO_SVC_REAR_, HOMO_SVC_RIGHT_);
-    // g_psd_wrapper_ = std::unique_ptr<psdonnx::PsdWrapper>(new psdonnx::PsdWrapper());
-    // g_psd_wrapper_ -> load_model(PCR_MODEL_PATH, PSD_MODEL_PATH);
-    g_json_dataset_ = std::unique_ptr<psdonnx::JsonDataset>(new psdonnx::JsonDataset(g_param_loader_->output_path_));
+
+    g_dmpr_wrapper_ = std::unique_ptr<psdonnx::DmprWrapper>(new psdonnx::DmprWrapper());
+    g_dmpr_wrapper_ -> load_model(g_param_loader_->dmpr_model_path_);
+    // g_dmpr_wrapper_ -> test();
+    // g_json_dataset_ = std::unique_ptr<psdonnx::JsonDataset>(new psdonnx::JsonDataset(g_param_loader_->output_path_));
 
     ros::Subscriber sub_img_front = n.subscribe(g_param_loader_->image_front_topic_, 100, img_front_callback);
     ros::Subscriber sub_img_left = n.subscribe(g_param_loader_->image_left_topic_, 100, img_left_callback);

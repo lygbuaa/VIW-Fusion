@@ -62,7 +62,7 @@ public:
 
     std::string project_rootdir_;
     std::string output_path_;
-    std::string pcr_model_path_;
+    std::string dmpr_model_path_;
     std::string psd_model_path_;
     std::string dataset_path_;
     std::string car_top_image_path_;
@@ -131,11 +131,8 @@ public:
         fs_["output_path"] >> output_path_;
         output_path_ = project_rootdir_ + output_path_;
 
-        fs_["pcr_model_path"] >> pcr_model_path_;
-        pcr_model_path_ = project_rootdir_ + pcr_model_path_;
-
-        fs_["psd_model_path"] >> psd_model_path_;
-        psd_model_path_ = project_rootdir_ + psd_model_path_;
+        fs_["dmpr_model_path"] >> dmpr_model_path_;
+        dmpr_model_path_ = project_rootdir_ + dmpr_model_path_;
 
         fs_["dataset_path"] >> dataset_path_;
         dataset_path_ = project_rootdir_ + dataset_path_;
@@ -143,8 +140,8 @@ public:
         fs_["car_top_image_path"] >> car_top_image_path_;
         car_top_image_path_ = project_rootdir_ + car_top_image_path_;
 
-        ROS_INFO("dataset_path_: %s, output_path_: %s, pcr_model_path_: %s, psd_model_path_: %s\n", \
-            dataset_path_.c_str(), output_path_.c_str(), pcr_model_path_.c_str(), psd_model_path_.c_str());
+        ROS_INFO("dataset_path_: %s, output_path_: %s, dmpr_model_path_: %s\n", \
+            dataset_path_.c_str(), output_path_.c_str(), dmpr_model_path_.c_str());
 
         fs_["image_front_topic"] >> image_front_topic_;
         fs_["image_left_topic"] >> image_left_topic_;

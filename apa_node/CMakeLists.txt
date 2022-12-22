@@ -13,7 +13,6 @@ find_package(catkin REQUIRED COMPONENTS
     nav_msgs
     tf
     cv_bridge
-    camera_models
     image_transport
         rosbag)
 set(OpenCV_DIR "/usr/local/share/OpenCV")
@@ -58,7 +57,6 @@ catkin_package(
     nav_msgs
     tf
     cv_bridge
-    camera_models
     image_transport
         rosbag
 )
