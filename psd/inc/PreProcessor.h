@@ -26,9 +26,9 @@ public:
         cv::Mat croped_img = crop(img, roi);
         cv::Mat resized_img = resize(img, 640, 640);
         cv::Mat norm_img = normalize(croped_img);
-        mat_2_vec(norm_img);
+        mat2vec(norm_img);
         cv::Mat stand_img = standardize(resized_img);
-        mat_2_vec(stand_img);
+        mat2vec(stand_img);
         cv::Vec3b original_pixel = img.at<cv::Vec3b>(0, 0);
         fprintf(stderr, "original_img w: %d, h: %d, type: %d, first-pixel: %d-%d-%d\n", img.cols, img.rows, img.type(), original_pixel[0], original_pixel[1], original_pixel[2]);
         cv::Vec3b croped_pixel = croped_img.at<cv::Vec3b>(0, 0);
@@ -46,24 +46,24 @@ public:
     }
 
     static cv::Mat crop(const cv::Mat& img, const cv::Rect& roi){
-        HANG_STOPWATCH();
+        // HANG_STOPWATCH();
 	// specifies the region of interest in Rectangle form
         return img(roi).clone(); 
     }
 
     static cv::Mat resize(const cv::Mat& img, const int out_w, const int out_h){
-        HANG_STOPWATCH();
-	cv::Mat resized_img;
+        // HANG_STOPWATCH();
+	    cv::Mat resized_img;
         cv::resize(img, resized_img, cv::Size(out_w, out_h), 0, 0, cv::INTER_LINEAR);
         return resized_img;
     }
 
     static cv::Mat normalize(const cv::Mat& img){
-	HANG_STOPWATCH();
+	    // HANG_STOPWATCH();
         cv::Mat norm_img;
         img.convertTo(norm_img, CV_32FC3, 1.0f/255, 0.0f);  //divided by 255
-        cv::Vec3f norm_pixel = norm_img.at<cv::Vec3f>(0, 0);
-        fprintf(stderr, "norm_img w: %d, h: %d, type: %d, first-pixel: %f-%f-%f\n", norm_img.cols, norm_img.rows, norm_img.type(), norm_pixel[0], norm_pixel[1], norm_pixel[2]);
+        // cv::Vec3f norm_pixel = norm_img.at<cv::Vec3f>(0, 0);
+        // fprintf(stderr, "norm_img w: %d, h: %d, type: %d, first-pixel: %f-%f-%f\n", norm_img.cols, norm_img.rows, norm_img.type(), norm_pixel[0], norm_pixel[1], norm_pixel[2]);
         return norm_img;
     }
 
@@ -71,7 +71,7 @@ public:
     static cv::Mat standardize(const cv::Mat& img){
         static const float rgb_mean[3] = {131.301f, 129.137f, 131.598f};
         static const float rgb_std[3] = {59.523f, 58.877f, 59.811f};
-        HANG_STOPWATCH();    
+        // HANG_STOPWATCH();
         std::vector<cv::Mat> rgb_ch(3);
         cv::split(img, rgb_ch);
         //blue chanel
@@ -85,7 +85,8 @@ public:
         return stand_img;
     }
 
-    static std::vector<float> mat_2_vec(const cv::Mat& img){
+    /* cv::Mat::reshape(1,1) should be the same */
+    static std::vector<float> mat2vec(const cv::Mat& img){
         std::vector<float> array;
         bool is_conti = img.isContinuous();
         if (is_conti) {
@@ -101,6 +102,31 @@ public:
         // fprintf(stderr, "img first-pixel: %f-%f-%f\n", img_pixel[0], img_pixel[1], img_pixel[2]);
         // fprintf(stderr, "array first-pixel: %f-%f-%f\n", array[0], array[1], array[2]);
         return array;
+    }
+
+#if 0
+    // cv::dnn::blobFromImage() only avaliable on opencv 3.4+
+    static std::vector<float> mat2nchw(const cv::Mat& img, const int outh, const int outw){
+        cv::Mat blob = cv::dnn::blobFromImage(img, 1.0f/255, cv::Size(outw, outh), cv::Scalar(0, 0, 0), false, false);
+        return std::vector<float>(blob.reshape(1, 1));
+    }
+#endif
+
+    /* use cv::dnn::blobFromImage() instead */
+    static void hwc2chw(const std::vector<float>& input, const size_t h, const size_t w, const size_t c, std::vector<float>& output){
+        const size_t stride = h*w;
+        output.resize(h*w*c);
+        for(size_t i=0; i<stride; ++i){
+            for(size_t j=0; j<c; ++j){
+                output[j*stride+i] = input[i*3+j];
+            }
+        }
+    }
+
+    static void dmpr_preprocess(cv::Mat& img, const size_t h, const size_t w, std::vector<float>& output){
+        const size_t c = img.channels();
+        std::vector<float> vec_hwc(normalize(resize(img, w, h)).reshape(1, 1));
+        hwc2chw(vec_hwc, h, w, c, output);
     }
 
 };

@@ -117,7 +117,7 @@ public:
             // fprintf(stderr, "%d-input_node_dims[0][k]: %ld, input_img_size: %ld\n", k, input_node_dims[0][k], input_img_size);
         }
         size_t input_img_length = input_img_size * sizeof(float);
-        std::vector<float> input_img_fp32 = PreProcessor::mat_2_vec(stand_img);
+        std::vector<float> input_img_fp32 = PreProcessor::mat2vec(stand_img);
         // fprintf(stderr, "input_img_length: %ld, input_img_fp32 size: %ld\n", input_img_length, input_img_fp32.size());
 
         /* only 1 input, move into input_tensors[0] */
@@ -211,7 +211,7 @@ public:
             // fprintf(stderr, "%d-input_node_dims[0][k]: %ld, input_img_size: %ld\n", k, input_node_dims[0][k], input_img_size);
         }
         size_t input_img_length = input_img_size * sizeof(float);
-        std::vector<float> input_img_fp32 = PreProcessor::mat_2_vec(norm_img);
+        std::vector<float> input_img_fp32 = PreProcessor::mat2vec(norm_img);
         // fprintf(stderr, "input_img_length: %ld, input_img_fp32 size: %ld\n", input_img_length, input_img_fp32.size());
 
         /* input[1]-image, type: 1, dims: (1,640,640,3,), move into input_tensors[1] */
