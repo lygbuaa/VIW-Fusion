@@ -10,6 +10,7 @@ find_package(catkin REQUIRED COMPONENTS
     roscpp
     std_msgs
     geometry_msgs
+    visualization_msgs
     nav_msgs
     tf
     cv_bridge
@@ -54,11 +55,12 @@ catkin_package(
   CATKIN_DEPENDS roscpp
     std_msgs
     geometry_msgs
+    visualization_msgs
     nav_msgs
     tf
     cv_bridge
     image_transport
-        rosbag
+    rosbag
 )
 
 add_executable(apa_node_bin src/apa_node.cc)

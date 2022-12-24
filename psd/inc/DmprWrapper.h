@@ -5,11 +5,14 @@
 #include <libgen.h>
 #include <chrono>
 #include <ros/ros.h>
+#include <visualization_msgs/Marker.h>
+#include <visualization_msgs/MarkerArray.h>
 #include "tinyjson.hpp"
 #include "PreProcessor.h"
 #include "OnnxWrapper.h"
 #include "viwo_utils.h"
 #include "DmprDefines.h"
+#include "ipm_composer.h"
 
 namespace psdonnx{
 class DmprWrapper
@@ -17,10 +20,23 @@ class DmprWrapper
 public:
     std::unique_ptr<OnnxWrapper> onnx_wrapper_;
     OutputRaw_t model_output_raw_;
+    std::vector<Parklot_t> g_slots_;
+    int g_slot_idx_ = 0;
+    int IMG_H_ = 0;
+    int IMG_W_ = 0;
+    float W0X_ = 0.0f;
+    float W0Y_ = 0.0f;
+    float WX_FENCE_[2] = {0.0f, 0.0f};
+    float WY_FENCE_[2] = {0.0f, 0.0f};
+    float ego_w0x_ = 0.0f;
+    float ego_w0y_ = 0.0f;
+    float ego_yaw_ = 0.0f;
+    ros::Publisher pub_parklots_;
 
 public:
     DmprWrapper(){
         onnx_wrapper_ = std::unique_ptr<OnnxWrapper>(new OnnxWrapper());
+        g_slot_idx_ = 0;
     }
     ~DmprWrapper(){}
 
@@ -28,15 +44,34 @@ public:
         onnx_wrapper_ -> test_dmpr_model();
     }
 
+    void init_pub_parklots(ros::NodeHandle& n){
+        pub_parklots_ = n.advertise<visualization_msgs::MarkerArray>("parklots", 1000);
+    }
+
     bool load_model(const std::string& dmpr_path){
         onnx_wrapper_ -> load_dmpr_model(dmpr_path);
+        /* set world original point */
+        W0X_ = 0.0f;
+        W0Y_ = 0.0f;
+        /* set world frame fence */
+        WX_FENCE_[0] = CARLA_WX_FENCE_[0] - W0X_;
+        WX_FENCE_[1] = CARLA_WX_FENCE_[1] - W0X_;
+        WY_FENCE_[0] = CARLA_WY_FENCE_[0] - W0Y_;
+        WY_FENCE_[1] = CARLA_WY_FENCE_[1] - W0Y_;
         return true;
     }
 
-    bool run_model(cv::Mat& img, Detections_t& det, bool debug_draw=false, const std::string& path=""){
+    bool run_model(SvcPairedImages_t& pis, Detections_t& det, bool debug_draw=false, const std::string& path=""){
         HANG_STOPWATCH();
+        cv::Mat& img = pis.img_ipm;
         det.h = img.rows;
         det.w = img.cols;
+        IMG_H_ = det.h;
+        IMG_W_ = det.w;
+        /* update ego pose */
+        ego_w0x_ = pis.x;
+        ego_w0y_ = pis.y;
+        ego_yaw_ = pis.yaw;
         onnx_wrapper_ -> run_dmpr_model(img, model_output_raw_);
 
         retrieve_marking_points(det);
@@ -75,12 +110,34 @@ public:
                     mp.y = (i+model_output_raw_.y[idx]) / (float)MP_ROW_;
                     mp.p0x = int(mp.x*det.w-0.5f);
                     mp.p0y = int(mp.y*det.h-0.5f);
+                    if(marking_point_out_fence(mp)){
+                        ROS_WARN("deprecate marking point out-of-fence: (%.1f, %.1f)", mp.wx, mp.wy);
+                        continue;
+                    }
                     det.mps.emplace_back(mp);
                 }
             }
         }
-        ROS_INFO("retrieve_marking_points count: %d\n", det.mps.size());
+        ROS_INFO("retrieve_marking_points count: %ld\n", det.mps.size());
         return det.mps.size();
+    }
+
+    /*
+    input: (ix, iy) in image frame, pixel
+    output: (wx, wy) in world frame, meter
+    */
+    bool calc_world_pose(const int ix, const int iy, float& wx, float& wy){
+        /* body frame, x-forward, y-right */
+        float bx = -1.0f*(iy-IMG_H_/2)/PPM_;
+        float by = (ix-IMG_W_/2)/PPM_;
+        wx = bx*cos(ego_yaw_) + by*sin(ego_yaw_) + ego_w0x_;
+        wy = bx*sin(ego_yaw_) - by*cos(ego_yaw_) + ego_w0y_;
+        return true;
+    }
+
+    bool marking_point_out_fence(MarkingPoint_t& mp){
+        calc_world_pose(mp.p0x, mp.p0y, mp.wx, mp.wy);
+        return (mp.wx<WX_FENCE_[0]) || (mp.wx>WX_FENCE_[1]) || (mp.wy<WY_FENCE_[0]) || (mp.wy>WY_FENCE_[1]);
     }
 
     void marking_point_add_branches(Detections_t& det){
@@ -269,10 +326,9 @@ public:
         return p2_match && p3_match;
     }
 
-
     void infer_parklots(Detections_t& det){
         // HANG_STOPWATCH();
-        int counter = 0;
+        static int counter = 0;
         det.slots.clear();
         for(MarkingPoint_t& mp : det.mps){
             /* only infer 'T' points */
@@ -288,7 +344,8 @@ public:
             MPBranch_t& br = mp.brs["branch_right"];
             if(!br.paired && infer_mp_branch_right_left(det, br)){
                 Parklot_t sr;
-                sr.idx = counter;
+                /* idx is global */
+                sr.idx = -1;
                 sr.p0.ix = mp.p0x;
                 sr.p0.iy = mp.p0y;
                 sr.p1.ix = bf.p1x;
@@ -299,6 +356,7 @@ public:
                 sr.p3.iy = br.p3y;
                 sr.center.ix = (sr.p0.ix+sr.p1.ix+sr.p2.ix+sr.p3.ix) / 4;
                 sr.center.iy = (sr.p0.iy+sr.p1.iy+sr.p2.iy+sr.p3.iy) / 4;
+                math_global_parklots(sr);
                 det.slots.push_back(sr);
                 counter += 1;
             }
@@ -306,7 +364,8 @@ public:
             MPBranch_t& bl = mp.brs["branch_left"];
             if(!bl.paired && infer_mp_branch_right_left(det, bl)){
                 Parklot_t sl;
-                sl.idx = counter;
+                /* idx is global */
+                sl.idx = -1;
                 sl.p0.ix = mp.p0x;
                 sl.p0.iy = mp.p0y;
                 sl.p1.ix = bf.p1x;
@@ -317,11 +376,67 @@ public:
                 sl.p3.iy = bl.p3y;
                 sl.center.ix = (sl.p0.ix+sl.p1.ix+sl.p2.ix+sl.p3.ix) / 4;
                 sl.center.iy = (sl.p0.iy+sl.p1.iy+sl.p2.iy+sl.p3.iy) / 4;
+                math_global_parklots(sl);
                 det.slots.push_back(sl);
                 counter += 1;
             }
         }
-        ROS_INFO("total parklots: %d\n", counter);
+        ROS_INFO("parklots counter: %d, global parklots: %ld\n", counter, g_slots_.size());
+    }
+
+    int math_global_parklots(Parklot_t& tmp_lot){
+        Vertex_t& tc = tmp_lot.center;
+        calc_world_pose(tc.ix, tc.iy, tc.wx, tc.wy);
+        calc_world_pose(tmp_lot.p0.ix, tmp_lot.p0.iy, tmp_lot.p0.wx, tmp_lot.p0.wy);
+        calc_world_pose(tmp_lot.p1.ix, tmp_lot.p1.iy, tmp_lot.p1.wx, tmp_lot.p1.wy);
+        calc_world_pose(tmp_lot.p2.ix, tmp_lot.p2.iy, tmp_lot.p2.wx, tmp_lot.p2.wy);
+        calc_world_pose(tmp_lot.p3.ix, tmp_lot.p3.iy, tmp_lot.p3.wx, tmp_lot.p3.wy);
+
+        float dist_min = SLOT_W_M_;
+        int idx = -1;
+        for(int i=0; i<g_slots_.size(); i++){
+            Parklot_t& glot = g_slots_[i];
+            Vertex_t& gc = glot.center;
+            float dist = sqrt((gc.wx-tc.wx)*(gc.wx-tc.wx)+(gc.wy-tc.wy)*(gc.wy-tc.wy));
+            if(dist<SLOT_W_M_/2.0f && dist<dist_min){
+                dist_min = dist;
+                idx = i;
+            }
+        }
+
+        if(idx >= 0){
+            /* parklot match, update world frame, don't update image frame */
+            Parklot_t& glot = g_slots_[idx];
+            glot.center.wx = 0.5f*glot.center.wx + 0.5f*tmp_lot.center.wx;
+            glot.center.wy = 0.5f*glot.center.wy + 0.5f*tmp_lot.center.wy;
+            glot.p0.wx = 0.5f*glot.p0.wx + 0.5f*tmp_lot.p0.wx;
+            glot.p0.wy = 0.5f*glot.p0.wy + 0.5f*tmp_lot.p0.wy;
+            glot.p1.wx = 0.5f*glot.p1.wx + 0.5f*tmp_lot.p1.wx;
+            glot.p1.wy = 0.5f*glot.p1.wy + 0.5f*tmp_lot.p1.wy;
+            glot.p2.wx = 0.5f*glot.p2.wx + 0.5f*tmp_lot.p2.wx;
+            glot.p2.wy = 0.5f*glot.p2.wy + 0.5f*tmp_lot.p2.wy;
+            glot.p3.wx = 0.5f*glot.p3.wx + 0.5f*tmp_lot.p3.wx;
+            glot.p3.wy = 0.5f*glot.p3.wy + 0.5f*tmp_lot.p3.wy;
+            tmp_lot.idx = glot.idx;
+            tmp_lot.center.wx = glot.center.wx;
+            tmp_lot.center.wy = glot.center.wy;
+            tmp_lot.p0.wx = glot.p0.wx;
+            tmp_lot.p0.wy = glot.p0.wy;
+            tmp_lot.p1.wx = glot.p1.wx;
+            tmp_lot.p1.wy = glot.p1.wy;
+            tmp_lot.p2.wx = glot.p2.wx;
+            tmp_lot.p2.wy = glot.p2.wy;
+            tmp_lot.p3.wx = glot.p3.wx;
+            tmp_lot.p3.wy = glot.p3.wy;
+            ROS_INFO("match global parklot[%d]: (%.1f, %.1f)", tmp_lot.idx, tmp_lot.center.wx, tmp_lot.center.wy);
+        }else{
+            /* add new global parklot */
+            tmp_lot.idx = g_slot_idx_;
+            g_slots_.push_back(tmp_lot);
+            ROS_INFO("create global parklot[%d]: (%.1f, %.1f)", tmp_lot.idx, tmp_lot.center.wx, tmp_lot.center.wy);
+            g_slot_idx_ += 1;
+        }
+        return idx;
     }
 
     void draw_marking_points(cv::Mat& img, const Detections_t& det){

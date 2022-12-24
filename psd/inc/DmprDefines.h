@@ -81,6 +81,9 @@ typedef struct{
     float dir_quad = 0.0;
     float x = 0.0;
     float y = 0.0;
+    /* world coordinate */
+    float wx = 0.0;
+    float wy = 0.0;
     int p0x = 0;
     int p0y = 0;
     std::unordered_map<std::string, MPBranch_t> brs;

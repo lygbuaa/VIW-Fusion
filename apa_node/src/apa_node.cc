@@ -20,6 +20,9 @@
 #include <sensor_msgs/image_encodings.h>
 #include <sensor_msgs/Imu.h>
 #include <nav_msgs/Odometry.h>
+#include <nav_msgs/Path.h>
+#include <geometry_msgs/PointStamped.h>
+#include <visualization_msgs/Marker.h>
 #include <opencv2/opencv.hpp>
 #include "DmprWrapper.h"
 #include "JsonDataset.h"
@@ -31,9 +34,11 @@ std::queue<sensor_msgs::ImuConstPtr> imu_buf_;
 std::mutex m_buf_;
 std::unique_ptr<IpmComposer> g_ipm_composer_;
 std::unique_ptr<psdonnx::DmprWrapper> g_dmpr_wrapper_;
-std::unique_ptr<psdonnx::JsonDataset> g_json_dataset_;
+// std::unique_ptr<psdonnx::JsonDataset> g_json_dataset_;
 std::shared_ptr<CvParamLoader> g_param_loader_;
 bool g_exit_ = false;
+ros::Publisher g_pub_ego_path_;
+nav_msgs::Path g_ego_path_;
 
 void img_front_callback(const sensor_msgs::ImageConstPtr &img_msg)
 {
@@ -67,6 +72,23 @@ void wheel_callback(const nav_msgs::OdometryConstPtr &odom_msg)
 {
     std::unique_lock<std::mutex> lock(m_buf_);
     g_ipm_composer_ -> PushOdom(odom_msg);
+
+    /* pub groudtruth ego path */
+    geometry_msgs::PoseStamped pose_stamped;
+    auto tmp_orientation = odom_msg->pose.pose.orientation;
+    auto tmp_position = odom_msg->pose.pose.position;
+    pose_stamped.header = odom_msg->header;
+    pose_stamped.header.frame_id = "world";
+    pose_stamped.pose.orientation = tmp_orientation;
+    /* consider original point here */
+    pose_stamped.pose.position.x = tmp_position.x;
+    pose_stamped.pose.position.y = tmp_position.y;
+    pose_stamped.pose.position.z = tmp_position.z;
+    g_ego_path_.header = odom_msg->header;
+    g_ego_path_.header.frame_id = "world";
+    g_ego_path_.poses.push_back(pose_stamped);
+    g_pub_ego_path_.publish(g_ego_path_);
+
     // double t = odom_msg->header.stamp.toSec();
     // double dx = odom_msg->twist.twist.linear.x;
     // double dy = odom_msg->twist.twist.linear.y;
@@ -132,8 +154,8 @@ void sync_process()
             time = -1.0f;
 	        psdonnx::Detections_t det;
 	        std::string psd_save_path = g_param_loader_->output_path_ + "/" + std::to_string(pis.time) + "_psd.png";
-	        // g_dmpr_wrapper_ -> run_model(pis.img_ipm, det, true, psd_save_path);
-	        g_dmpr_wrapper_ -> run_model(pis.img_ipm, det, true);
+	        g_dmpr_wrapper_ -> run_model(pis, det, true, psd_save_path);
+	        // g_dmpr_wrapper_ -> run_model(pis.img_ipm, det, true);
             g_ipm_composer_ -> PubIpmImage(pis.img_ipm, pis.time);
         }
 
@@ -192,9 +214,11 @@ int main(int argc, char **argv)
 
     g_dmpr_wrapper_ = std::unique_ptr<psdonnx::DmprWrapper>(new psdonnx::DmprWrapper());
     g_dmpr_wrapper_ -> load_model(g_param_loader_->dmpr_model_path_);
+    g_dmpr_wrapper_ -> init_pub_parklots(n);
     // g_dmpr_wrapper_ -> test();
     // g_json_dataset_ = std::unique_ptr<psdonnx::JsonDataset>(new psdonnx::JsonDataset(g_param_loader_->output_path_));
 
+    g_pub_ego_path_ = n.advertise<nav_msgs::Path>("ego_path", 1000);
     ros::Subscriber sub_img_front = n.subscribe(g_param_loader_->image_front_topic_, 100, img_front_callback);
     ros::Subscriber sub_img_left = n.subscribe(g_param_loader_->image_left_topic_, 100, img_left_callback);
     ros::Subscriber sub_img_rear = n.subscribe(g_param_loader_->image_rear_topic_, 100, img_rear_callback);

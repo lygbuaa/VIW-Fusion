@@ -512,4 +512,4 @@ private:
 
 };
 
-#endif IPM_COMPOSER_H
+#endif //IPM_COMPOSER_H
