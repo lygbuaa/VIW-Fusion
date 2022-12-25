@@ -63,6 +63,7 @@ public:
 
     bool run_model(SvcPairedImages_t& pis, Detections_t& det, bool debug_draw=false, const std::string& path=""){
         HANG_STOPWATCH();
+        static double last_t = -2.0f;
         cv::Mat& img = pis.img_ipm;
         det.h = img.rows;
         det.w = img.cols;
@@ -82,6 +83,10 @@ public:
         if(debug_draw){
             draw_marking_points(img, det);
             draw_parklots(img, det);
+            if(pis.time-last_t>1.0f){
+                last_t = pis.time;
+                pub_parklots(pis.time);
+            }
         }
 
         if(path.size()>3){
@@ -482,6 +487,58 @@ public:
             sprintf(tmp, "%d", slot.idx);
             cv::putText(img, tmp, cv::Point(cx, cy), cv::FONT_HERSHEY_DUPLEX, 1.0, text_color, 2);
         }
+    }
+
+    void pub_parklots(double t){
+        visualization_msgs::MarkerArray markerArray_msg;
+        std_msgs::Header header;
+        header.frame_id = "world";
+        header.stamp = ros::Time(t);
+
+        for(const Parklot_t& slot : g_slots_){
+            visualization_msgs::Marker marker;
+            marker.header = header;
+            marker.id = slot.idx;
+            marker.text = std::to_string(slot.idx);
+            marker.ns = "parklots";
+            marker.type = visualization_msgs::Marker::LINE_STRIP;
+            marker.action = visualization_msgs::Marker::ADD;
+            marker.color.r = 0.0f;
+            marker.color.g = 1.0f;
+            marker.color.b = 0.0f;
+            marker.color.a = 1.0f;
+            /* markers last for 1.1 sec */
+            marker.lifetime = ros::Duration(1.1f);
+
+            marker.scale.x = 1.0f;
+            marker.pose.position.x = 0.0;
+            marker.pose.position.y = 0.0;
+            marker.pose.position.z = 0.0;
+            marker.pose.orientation.w = 1.0;
+            marker.pose.orientation.x = 0.0;
+            marker.pose.orientation.y = 0.0;
+            marker.pose.orientation.z = 0.0;
+
+            geometry_msgs::Point p0, p1, p2, p3;
+            p0.x = slot.p0.wx;
+            p0.y = slot.p0.wy;
+            p0.z = 0.0f;
+            p1.x = slot.p1.wx;
+            p1.y = slot.p1.wy;
+            p1.z = 0.0f;
+            p2.x = slot.p2.wx;
+            p2.y = slot.p2.wy;
+            p2.z = 0.0f;
+            p3.x = slot.p3.wx;
+            p3.y = slot.p3.wy;
+            p3.z = 0.0f;
+            marker.points.push_back(p0);
+            marker.points.push_back(p1);
+            marker.points.push_back(p2);
+            marker.points.push_back(p3);
+            markerArray_msg.markers.push_back(marker);
+        }
+        pub_parklots_.publish(markerArray_msg);
     }
 
     float round_direction(const float dir) const {
