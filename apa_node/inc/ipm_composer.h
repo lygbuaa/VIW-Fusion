@@ -7,6 +7,7 @@
 #include <nav_msgs/Odometry.h>
 #include "viwo_utils.h"
 #include "CvParamLoader.h"
+#include "DmprDefines.h"
 
 enum class SvcIndex_t : int{
     VOID = -1,
@@ -45,6 +46,8 @@ public:
     static constexpr float DT_THRESHOLD_SEC_ = 0.02f;
     static constexpr int BUFFER_MAX_ = 10;
     static constexpr double PI_ = 3.141592741;
+    float W0X_ = 0.0f;
+    float W0Y_ = 0.0f;
     std::shared_ptr<CvParamLoader> cpl_;
 
 private:
@@ -95,6 +98,8 @@ public:
         ROS_INFO("g_params_.HOMO_SVC_RIGHT_: %s\n", ViwoUtils::CvMat2Str(g_params_.HOMO_SVC_RIGHT_).c_str());
         GenIpmMasksBow1();
         ReadCarModel(cpl_->car_top_image_path_);
+        W0X_ = (psdonnx::CARLA_WX_FENCE_[0] + psdonnx::CARLA_WX_FENCE_[1]) * 0.5f;
+        W0Y_ = (psdonnx::CARLA_WY_FENCE_[0] + psdonnx::CARLA_WY_FENCE_[1]) * 0.5f;
     }
 
     bool ReadCarModel(std::string car_img_path){
@@ -125,7 +130,7 @@ public:
     //Eigen::Quaterniond& quat, Eigen::Vector3d& loc
     void PushOdom(const nav_msgs::OdometryConstPtr &odom_msg){
         odom_buf_ptr_ -> push(odom_msg);
-        if(odom_buf_ptr_->size() > BUFFER_MAX_*10){
+        if(odom_buf_ptr_->size() > BUFFER_MAX_*3){
             odom_buf_ptr_ -> pop();
         }
     }
@@ -208,8 +213,8 @@ public:
                 paired_images.yaw = cov[2];//euler[0]; //tmp_Q.z*2;
 
                 Eigen::Vector3d loc = Eigen::Vector3d(tmp_T.x, tmp_T.y, tmp_T.z);
-                paired_images.x = loc[0];
-                paired_images.y = loc[1];
+                paired_images.x = loc[0] - W0X_;
+                paired_images.y = loc[1] - W0Y_;
                 paired_images.z = loc[2];
                 ROS_INFO("sync image time: %f, odom time: %f, cov: %.2f, %.2f, %.2f, %.2f", paired_images.time, t, cov[0], cov[1], cov[2], cov[3]);
                 break;
@@ -280,12 +285,34 @@ public:
         car_top_img.copyTo(ipm_roi, mask);
     }
 
-    void PubIpmImage(cv::Mat& img_ipm, const double t){
+    void PubIpmImage(SvcPairedImages_t& pis, const double t){
+        cv::Mat& img_ipm = pis.img_ipm;
         AddCarTopview(img_ipm, car_top_view_);
+#if 1
+        /* make a big image to display */
+        using namespace psdonnx;
+        const int svc_w = DMPR_W_;  //512
+        const int svc_h = svc_w * 9 / 16; //288
+        const int big_w = DMPR_W_ + svc_w*2 + 20;
+        const int big_h = DMPR_H_ + svc_h*2 + 20;
+        cv::Mat img_front = psdonnx::PreProcessor::resize(pis.img_front, svc_w, svc_h);
+        cv::Mat img_left = psdonnx::PreProcessor::resize(pis.img_left, svc_w, svc_h);
+        cv::Mat img_right = psdonnx::PreProcessor::resize(pis.img_right, svc_w, svc_h);
+        cv::Mat img_rear = psdonnx::PreProcessor::resize(pis.img_rear, svc_w, svc_h);
+
+        cv::Mat big_img = cv::Mat::zeros(big_h, big_w, CV_8UC3);
+        cv::Mat svc_mask = cv::Mat::ones(svc_h, svc_w, CV_8UC1);
+        cv::Mat ipm_mask = cv::Mat::ones(DMPR_H_, DMPR_W_, CV_8UC1);
+        img_ipm.copyTo(big_img(cv::Rect(svc_w+10, svc_h+10, DMPR_W_, DMPR_H_)), ipm_mask);
+        img_front.copyTo(big_img(cv::Rect(svc_w+10, 0, svc_w, svc_h)), svc_mask);
+        img_left.copyTo(big_img(cv::Rect(0, svc_h+122, svc_w, svc_h)), svc_mask);
+        img_rear.copyTo(big_img(cv::Rect(svc_w+10, DMPR_H_+svc_h+20, svc_w, svc_h)), svc_mask);
+        img_right.copyTo(big_img(cv::Rect(DMPR_W_+svc_w+20, svc_h+122, svc_w, svc_h)), svc_mask);
+#endif
         std_msgs::Header header;
         header.frame_id = "world";
         header.stamp = ros::Time(t);
-        sensor_msgs::ImagePtr imgIpmMsg = cv_bridge::CvImage(header, "bgr8", img_ipm).toImageMsg();
+        sensor_msgs::ImagePtr imgIpmMsg = cv_bridge::CvImage(header, "bgr8", big_img).toImageMsg();
         pub_image_ipm_.publish(imgIpmMsg);
     }
 

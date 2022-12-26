@@ -28,12 +28,12 @@ constexpr static float DMPR_THRESH_ = 0.8f;
 constexpr static size_t MP_ROW_ = 16;
 constexpr static size_t MP_COL_ = 16;
 
-/* pixel per meter */
-constexpr static float PPM_ = 640.0f/18.0f;
+/* pixel per meter, 1.1f is a magic number */
+constexpr static float PPM_ = DMPR_H_/18.0f * 1.1f;
 /* length of parklots, in meter */
-constexpr static float SLOT_L_M_ = 5.9f;
+constexpr static float SLOT_L_M_ = 5.5f;
 /* width of parklots, in meter */
-constexpr static float SLOT_W_M_ = 3.8f;
+constexpr static float SLOT_W_M_ = 3.5f;
 /* length of parklots, in pixel */
 constexpr static float SLOT_L_ = SLOT_L_M_ * PPM_;
 /* width of parklots, in pixel */

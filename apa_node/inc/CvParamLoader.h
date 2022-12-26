@@ -7,8 +7,8 @@
 #include "viwo_utils.h"
 
 typedef struct{
-    int BEV_H_ = 640;
-    int BEV_W_ = 640;
+    int BEV_H_ = 512;
+    int BEV_W_ = 512;
     double BEV_XMAX_ = 16.0f;
     double BEV_YMAX_ = 16.0f;
     double PPM_ = 1.0f;

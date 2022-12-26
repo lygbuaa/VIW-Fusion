@@ -51,8 +51,8 @@ public:
     bool load_model(const std::string& dmpr_path){
         onnx_wrapper_ -> load_dmpr_model(dmpr_path);
         /* set world original point */
-        W0X_ = 0.0f;
-        W0Y_ = 0.0f;
+        W0X_ = (CARLA_WX_FENCE_[0] + CARLA_WX_FENCE_[1]) * 0.5f;
+        W0Y_ = (CARLA_WY_FENCE_[0] + CARLA_WY_FENCE_[1]) * 0.5f;
         /* set world frame fence */
         WX_FENCE_[0] = CARLA_WX_FENCE_[0] - W0X_;
         WX_FENCE_[1] = CARLA_WX_FENCE_[1] - W0X_;
@@ -64,6 +64,7 @@ public:
     bool run_model(SvcPairedImages_t& pis, Detections_t& det, bool debug_draw=false, const std::string& path=""){
         HANG_STOPWATCH();
         static double last_t = -2.0f;
+        static bool pose_init = false;
         cv::Mat& img = pis.img_ipm;
         det.h = img.rows;
         det.w = img.cols;
@@ -73,6 +74,12 @@ public:
         ego_w0x_ = pis.x;
         ego_w0y_ = pis.y;
         ego_yaw_ = pis.yaw;
+        ROS_INFO("det.h: %d, det.w: %d, ego_w0x: %.1f, ego_w0y: %.1f", det.h, det.w, ego_w0x_, ego_w0y_);
+
+        if(!pose_init){
+            pose_init = true;
+            return false;
+        }
         onnx_wrapper_ -> run_dmpr_model(img, model_output_raw_);
 
         retrieve_marking_points(det);
@@ -133,8 +140,8 @@ public:
     */
     bool calc_world_pose(const int ix, const int iy, float& wx, float& wy){
         /* body frame, x-forward, y-right */
-        float bx = -1.0f*(iy-IMG_H_/2)/PPM_;
-        float by = (ix-IMG_W_/2)/PPM_;
+        float bx = -1.0f*(iy-IMG_H_*0.5f)/PPM_;
+        float by = (ix-IMG_W_*0.5f)/PPM_;
         wx = bx*cos(ego_yaw_) + by*sin(ego_yaw_) + ego_w0x_;
         wy = bx*sin(ego_yaw_) - by*cos(ego_yaw_) + ego_w0y_;
         return true;
@@ -361,7 +368,7 @@ public:
                 sr.p3.iy = br.p3y;
                 sr.center.ix = (sr.p0.ix+sr.p1.ix+sr.p2.ix+sr.p3.ix) / 4;
                 sr.center.iy = (sr.p0.iy+sr.p1.iy+sr.p2.iy+sr.p3.iy) / 4;
-                math_global_parklots(sr);
+                match_global_parklots(sr);
                 det.slots.push_back(sr);
                 counter += 1;
             }
@@ -381,7 +388,7 @@ public:
                 sl.p3.iy = bl.p3y;
                 sl.center.ix = (sl.p0.ix+sl.p1.ix+sl.p2.ix+sl.p3.ix) / 4;
                 sl.center.iy = (sl.p0.iy+sl.p1.iy+sl.p2.iy+sl.p3.iy) / 4;
-                math_global_parklots(sl);
+                match_global_parklots(sl);
                 det.slots.push_back(sl);
                 counter += 1;
             }
@@ -389,7 +396,12 @@ public:
         ROS_INFO("parklots counter: %d, global parklots: %ld\n", counter, g_slots_.size());
     }
 
-    int math_global_parklots(Parklot_t& tmp_lot){
+    int match_global_parklots(Parklot_t& tmp_lot){
+        /* magic operation, stop matching while car running on the short edge */
+        if(fabs(fabs(ego_yaw_)-M_PI/2.0f) > M_PI/10.0f){
+            return -1;
+        }
+
         Vertex_t& tc = tmp_lot.center;
         calc_world_pose(tc.ix, tc.iy, tc.wx, tc.wy);
         calc_world_pose(tmp_lot.p0.ix, tmp_lot.p0.iy, tmp_lot.p0.wx, tmp_lot.p0.wy);
@@ -403,7 +415,7 @@ public:
             Parklot_t& glot = g_slots_[i];
             Vertex_t& gc = glot.center;
             float dist = sqrt((gc.wx-tc.wx)*(gc.wx-tc.wx)+(gc.wy-tc.wy)*(gc.wy-tc.wy));
-            if(dist<SLOT_W_M_/2.0f && dist<dist_min){
+            if(dist<SLOT_W_M_*0.8f && dist<dist_min){
                 dist_min = dist;
                 idx = i;
             }
@@ -412,16 +424,16 @@ public:
         if(idx >= 0){
             /* parklot match, update world frame, don't update image frame */
             Parklot_t& glot = g_slots_[idx];
-            glot.center.wx = 0.5f*glot.center.wx + 0.5f*tmp_lot.center.wx;
-            glot.center.wy = 0.5f*glot.center.wy + 0.5f*tmp_lot.center.wy;
-            glot.p0.wx = 0.5f*glot.p0.wx + 0.5f*tmp_lot.p0.wx;
-            glot.p0.wy = 0.5f*glot.p0.wy + 0.5f*tmp_lot.p0.wy;
-            glot.p1.wx = 0.5f*glot.p1.wx + 0.5f*tmp_lot.p1.wx;
-            glot.p1.wy = 0.5f*glot.p1.wy + 0.5f*tmp_lot.p1.wy;
-            glot.p2.wx = 0.5f*glot.p2.wx + 0.5f*tmp_lot.p2.wx;
-            glot.p2.wy = 0.5f*glot.p2.wy + 0.5f*tmp_lot.p2.wy;
-            glot.p3.wx = 0.5f*glot.p3.wx + 0.5f*tmp_lot.p3.wx;
-            glot.p3.wy = 0.5f*glot.p3.wy + 0.5f*tmp_lot.p3.wy;
+            glot.center.wx = 0.1f*glot.center.wx + 0.9f*tmp_lot.center.wx;
+            glot.center.wy = 0.1f*glot.center.wy + 0.9f*tmp_lot.center.wy;
+            glot.p0.wx = 0.1f*glot.p0.wx + 0.9f*tmp_lot.p0.wx;
+            glot.p0.wy = 0.1f*glot.p0.wy + 0.9f*tmp_lot.p0.wy;
+            glot.p1.wx = 0.1f*glot.p1.wx + 0.9f*tmp_lot.p1.wx;
+            glot.p1.wy = 0.1f*glot.p1.wy + 0.9f*tmp_lot.p1.wy;
+            glot.p2.wx = 0.1f*glot.p2.wx + 0.9f*tmp_lot.p2.wx;
+            glot.p2.wy = 0.1f*glot.p2.wy + 0.9f*tmp_lot.p2.wy;
+            glot.p3.wx = 0.1f*glot.p3.wx + 0.9f*tmp_lot.p3.wx;
+            glot.p3.wy = 0.1f*glot.p3.wy + 0.9f*tmp_lot.p3.wy;
             tmp_lot.idx = glot.idx;
             tmp_lot.center.wx = glot.center.wx;
             tmp_lot.center.wy = glot.center.wy;
@@ -507,10 +519,10 @@ public:
             marker.color.g = 1.0f;
             marker.color.b = 0.0f;
             marker.color.a = 1.0f;
-            /* markers last for 1.1 sec */
-            marker.lifetime = ros::Duration(1.1f);
+            /* markers last for 1.2 sec */
+            marker.lifetime = ros::Duration(0.0f);
 
-            marker.scale.x = 1.0f;
+            marker.scale.x = 0.2f;
             marker.pose.position.x = 0.0;
             marker.pose.position.y = 0.0;
             marker.pose.position.z = 0.0;
@@ -536,6 +548,7 @@ public:
             marker.points.push_back(p1);
             marker.points.push_back(p2);
             marker.points.push_back(p3);
+            marker.points.push_back(p0);
             markerArray_msg.markers.push_back(marker);
         }
         pub_parklots_.publish(markerArray_msg);

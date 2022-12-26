@@ -70,6 +70,9 @@ void img_right_callback(const sensor_msgs::ImageConstPtr &img_msg)
 
 void wheel_callback(const nav_msgs::OdometryConstPtr &odom_msg)
 {
+    static float W0X_ = (psdonnx::CARLA_WX_FENCE_[0] + psdonnx::CARLA_WX_FENCE_[1]) * 0.5f;
+    static float W0Y_ = (psdonnx::CARLA_WY_FENCE_[0] + psdonnx::CARLA_WY_FENCE_[1]) * 0.5f;
+
     std::unique_lock<std::mutex> lock(m_buf_);
     g_ipm_composer_ -> PushOdom(odom_msg);
 
@@ -81,8 +84,8 @@ void wheel_callback(const nav_msgs::OdometryConstPtr &odom_msg)
     pose_stamped.header.frame_id = "world";
     pose_stamped.pose.orientation = tmp_orientation;
     /* consider original point here */
-    pose_stamped.pose.position.x = tmp_position.x;
-    pose_stamped.pose.position.y = tmp_position.y;
+    pose_stamped.pose.position.x = tmp_position.x - W0X_;
+    pose_stamped.pose.position.y = tmp_position.y - W0Y_;
     pose_stamped.pose.position.z = tmp_position.z;
     g_ego_path_.header = odom_msg->header;
     g_ego_path_.header.frame_id = "world";
@@ -154,9 +157,9 @@ void sync_process()
             time = -1.0f;
 	        psdonnx::Detections_t det;
 	        std::string psd_save_path = g_param_loader_->output_path_ + "/" + std::to_string(pis.time) + "_psd.png";
-	        g_dmpr_wrapper_ -> run_model(pis, det, true, psd_save_path);
-	        // g_dmpr_wrapper_ -> run_model(pis.img_ipm, det, true);
-            g_ipm_composer_ -> PubIpmImage(pis.img_ipm, pis.time);
+	        // g_dmpr_wrapper_ -> run_model(pis, det, true, psd_save_path);
+	        g_dmpr_wrapper_ -> run_model(pis, det, true);
+            g_ipm_composer_ -> PubIpmImage(pis, pis.time);
         }
 
         std::chrono::milliseconds dura(5);
