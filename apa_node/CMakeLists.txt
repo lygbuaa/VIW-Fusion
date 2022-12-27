@@ -21,8 +21,6 @@ find_package(OpenCV REQUIRED)
 
 message(WARNING "OpenCV_VERSION: ${OpenCV_VERSION}")
 
-find_package(Ceres REQUIRED)
-
 include_directories(
   ${CERES_INCLUDE_DIRS}
   ${PROJECT_SOURCE_DIR}/../common/
