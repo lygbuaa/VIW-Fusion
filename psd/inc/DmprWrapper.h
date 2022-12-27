@@ -126,6 +126,10 @@ public:
                         ROS_WARN("deprecate marking point out-of-fence: (%.1f, %.1f)", mp.wx, mp.wy);
                         continue;
                     }
+                    if(marking_point_invalid_direction(mp)){
+                        ROS_WARN("deprecate marking point invalid direction: (%.2f)", mp.direction);
+                        continue;
+                    }
                     det.mps.emplace_back(mp);
                 }
             }
@@ -150,6 +154,12 @@ public:
     bool marking_point_out_fence(MarkingPoint_t& mp){
         calc_world_pose(mp.p0x, mp.p0y, mp.wx, mp.wy);
         return (mp.wx<WX_FENCE_[0]) || (mp.wx>WX_FENCE_[1]) || (mp.wy<WY_FENCE_[0]) || (mp.wy>WY_FENCE_[1]);
+    }
+
+    /* only useful in carla.town04 */
+    bool marking_point_invalid_direction(MarkingPoint_t& mp){
+        float dir_diff = round_direction(mp.direction - ego_yaw_);
+        return fabs((fabs(dir_diff) - M_PI/2.0f)) > M_PI/8.0f;
     }
 
     void marking_point_add_branches(Detections_t& det){
@@ -398,9 +408,9 @@ public:
 
     int match_global_parklots(Parklot_t& tmp_lot){
         /* magic operation, stop matching while car running on the short edge */
-        if(fabs(fabs(ego_yaw_)-M_PI/2.0f) > M_PI/10.0f){
-            return -1;
-        }
+        // if(fabs(fabs(ego_yaw_)-M_PI/2.0f) > M_PI/10.0f){
+        //     return -1;
+        // }
 
         Vertex_t& tc = tmp_lot.center;
         calc_world_pose(tc.ix, tc.iy, tc.wx, tc.wy);
@@ -415,7 +425,7 @@ public:
             Parklot_t& glot = g_slots_[i];
             Vertex_t& gc = glot.center;
             float dist = sqrt((gc.wx-tc.wx)*(gc.wx-tc.wx)+(gc.wy-tc.wy)*(gc.wy-tc.wy));
-            if(dist<SLOT_W_M_*0.8f && dist<dist_min){
+            if(dist<SLOT_W_M_*0.4f && dist<dist_min){
                 dist_min = dist;
                 idx = i;
             }

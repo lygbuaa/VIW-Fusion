@@ -15,8 +15,9 @@ namespace psdonnx
 #endif
 
 /* world coord fence */
-constexpr static float CARLA_WX_FENCE_[2] = {267.0f, 304.0f};
-constexpr static float CARLA_WY_FENCE_[2] = {183.0f, 240.0f};
+constexpr static float CARLA_WX_FENCE_[2] = {270.0f, 300.5f};
+constexpr static float CARLA_WY_FENCE_[2] = {185.0f, 236.0f};
+constexpr static float PARKLOT_Z0_ = 0.32f;
 
 /* model input width & height */
 constexpr static int DMPR_W_ = 512;
@@ -29,17 +30,17 @@ constexpr static size_t MP_ROW_ = 16;
 constexpr static size_t MP_COL_ = 16;
 
 /* pixel per meter, 1.1f is a magic number */
-constexpr static float PPM_ = DMPR_H_/18.0f * 1.1f;
+constexpr static float PPM_ = DMPR_H_/16.0f;
 /* length of parklots, in meter */
-constexpr static float SLOT_L_M_ = 5.5f;
+constexpr static float SLOT_L_M_ = 5.0f;
 /* width of parklots, in meter */
-constexpr static float SLOT_W_M_ = 3.5f;
+constexpr static float SLOT_W_M_ = 3.2f;
 /* length of parklots, in pixel */
 constexpr static float SLOT_L_ = SLOT_L_M_ * PPM_;
 /* width of parklots, in pixel */
 constexpr static float SLOT_W_ = SLOT_W_M_ * PPM_;
 /* if two point near than, treate as the same */
-constexpr static float VERTEX_MATCH_TH_ = SLOT_W_ / 2.0f;
+constexpr static float VERTEX_MATCH_TH_ = SLOT_W_ / 3.0f;
 /* if two marking-point direction diff less than, put into the same cluster */
 constexpr static float DIRECTION_CLUSTER_TH_ = M_PI / 20.0f;
 /* if marking-point direction fall in, fix it */

@@ -35,7 +35,17 @@ include_directories(
 
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 set(ORT_BASE_DIR ${PROJECT_SOURCE_DIR}/../psd/ort)
-set(ORT_LIB ${ORT_BASE_DIR}/onnxruntime-linux-x64-1.13.1/lib/libonnxruntime.so)
+
+EXECUTE_PROCESS(COMMAND uname -m COMMAND tr -d '\n' OUTPUT_VARIABLE ARCHITECTURE)
+MESSAGE(STATUS "cpu architecture: ${ARCHITECTURE}")
+if(${ARCHITECTURE} STREQUAL "x86_64")
+  set(ORT_LIB ${ORT_BASE_DIR}/onnxruntime-linux-x64-1.13.1/lib/libonnxruntime.so)
+elseif(${ARCHITECTURE} STREQUAL "aarch64")
+  set(ORT_LIB ${ORT_BASE_DIR}/onnxruntime-linux-aarch64-1.13.1/lib/libonnxruntime.so)
+else()
+  MESSAGE(FATAL_ERROR "invalid cpu architecture!")
+endif()
+
 set(PSD_BASE_DIR ${PROJECT_SOURCE_DIR}/../psd)
 
 MESSAGE(STATUS "onnxruntime lib path: " ${ORT_LIB})

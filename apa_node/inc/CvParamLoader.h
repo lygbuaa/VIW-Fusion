@@ -5,6 +5,7 @@
 #include <opencv2/core/eigen.hpp>
 #include <ros/ros.h>
 #include "viwo_utils.h"
+#include "DmprDefines.h"
 
 typedef struct{
     int BEV_H_ = 512;
@@ -216,7 +217,9 @@ public:
         homo_update_rate_ = cos(g_params_.EULER_SVC_FRONT_31_.at<double>(0, 0));
     }
 
-    void update_homo(double car_pitch=0.0, double car_roll=0.0, double car_yaw=0.0){
+    void update_homo(double car_pitch=0.0, double car_roll=0.0, double car_yaw=0.0, double ego_z0 = 0.0){
+        /* fix scale error introduced by parklot line height change */
+        const double z0_bump = ego_z0 - psdonnx::PARKLOT_Z0_;
         car_pitch *= homo_update_rate_;
         car_roll *= homo_update_rate_;
 
@@ -237,7 +240,7 @@ public:
         e_front_c2b_44.at<double>(2, 0) = front_rot_33.at<double>(2, 0);
         e_front_c2b_44.at<double>(2, 1) = front_rot_33.at<double>(2, 1);
         e_front_c2b_44.at<double>(2, 2) = front_rot_33.at<double>(2, 2);
-        e_front_c2b_44.at<double>(2, 3) = g_params_.T_SVC_FRONT_31_.at<double>(2, 0);
+        e_front_c2b_44.at<double>(2, 3) = g_params_.T_SVC_FRONT_31_.at<double>(2, 0) + z0_bump;
         g_params_.E_FRONT_B2C_44_ = e_front_c2b_44.inv();
         // ROS_INFO("E_FRONT_B2C_44_: %s", ViwoUtils::CvMat2Str(g_params_.E_FRONT_B2C_44_).c_str());
         //4. calc HOMO_SVC_FRONT_
@@ -261,7 +264,7 @@ public:
         e_left_c2b_44.at<double>(2, 0) = left_rot_33.at<double>(2, 0);
         e_left_c2b_44.at<double>(2, 1) = left_rot_33.at<double>(2, 1);
         e_left_c2b_44.at<double>(2, 2) = left_rot_33.at<double>(2, 2);
-        e_left_c2b_44.at<double>(2, 3) = g_params_.T_SVC_LEFT_31_.at<double>(2, 0);
+        e_left_c2b_44.at<double>(2, 3) = g_params_.T_SVC_LEFT_31_.at<double>(2, 0) + z0_bump;
         g_params_.E_LEFT_B2C_44_ = e_left_c2b_44.inv();
         // ROS_INFO("E_LEFT_B2C_44_: %s", ViwoUtils::CvMat2Str(g_params_.E_LEFT_B2C_44_).c_str());
         cv::Mat h_bev_to_left = g_params_.K_SVC_34_*(g_params_.E_LEFT_B2C_44_*(g_params_.E_BEV_C2B_44_*g_params_.INV_K_BEV_43_));
@@ -284,7 +287,7 @@ public:
         e_rear_c2b_44.at<double>(2, 0) = rear_rot_33.at<double>(2, 0);
         e_rear_c2b_44.at<double>(2, 1) = rear_rot_33.at<double>(2, 1);
         e_rear_c2b_44.at<double>(2, 2) = rear_rot_33.at<double>(2, 2);
-        e_rear_c2b_44.at<double>(2, 3) = g_params_.T_SVC_REAR_31_.at<double>(2, 0);
+        e_rear_c2b_44.at<double>(2, 3) = g_params_.T_SVC_REAR_31_.at<double>(2, 0) + z0_bump;
         g_params_.E_REAR_B2C_44_ = e_rear_c2b_44.inv();
         // ROS_INFO("E_REAR_B2C_44_: %s", ViwoUtils::CvMat2Str(g_params_.E_REAR_B2C_44_).c_str());
         cv::Mat h_bev_to_rear = g_params_.K_SVC_34_*(g_params_.E_REAR_B2C_44_*(g_params_.E_BEV_C2B_44_*g_params_.INV_K_BEV_43_));
@@ -307,7 +310,7 @@ public:
         e_right_c2b_44.at<double>(2, 0) = right_rot_33.at<double>(2, 0);
         e_right_c2b_44.at<double>(2, 1) = right_rot_33.at<double>(2, 1);
         e_right_c2b_44.at<double>(2, 2) = right_rot_33.at<double>(2, 2);
-        e_right_c2b_44.at<double>(2, 3) = g_params_.T_SVC_RIGHT_31_.at<double>(2, 0);
+        e_right_c2b_44.at<double>(2, 3) = g_params_.T_SVC_RIGHT_31_.at<double>(2, 0) + z0_bump;
         g_params_.E_RIGHT_B2C_44_ = e_right_c2b_44.inv();
         // ROS_INFO("E_RIGHT_B2C_44_: %s", ViwoUtils::CvMat2Str(g_params_.E_RIGHT_B2C_44_).c_str());
         cv::Mat h_bev_to_right = g_params_.K_SVC_34_*(g_params_.E_RIGHT_B2C_44_*(g_params_.E_BEV_C2B_44_*g_params_.INV_K_BEV_43_));

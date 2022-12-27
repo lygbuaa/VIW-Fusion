@@ -105,7 +105,7 @@ public:
     bool ReadCarModel(std::string car_img_path){
         cv::Mat car_top_view = cv::imread(car_img_path, cv::IMREAD_COLOR);
         float h_w_ration = (float)car_top_view.rows / car_top_view.cols;
-        g_params_.CAR_MODEL_W_ = int(g_params_.SVC_RIGHT_X0_ - g_params_.SVC_LEFT_X0_) + 40;
+        g_params_.CAR_MODEL_W_ = int(g_params_.SVC_RIGHT_X0_ - g_params_.SVC_LEFT_X0_) + 30;
         // g_params_.CAR_MODEL_H_ = int(g_params_.SVC_REAR_Y0_ - g_params_.SVC_FRONT_Y0_) + 2;
         g_params_.CAR_MODEL_H_ = int(g_params_.CAR_MODEL_W_ * h_w_ration);
         car_top_view_ = psdonnx::PreProcessor::resize(car_top_view, g_params_.CAR_MODEL_W_, g_params_.CAR_MODEL_H_);
@@ -230,7 +230,7 @@ public:
         const cv::Mat& img_right = pis.img_right;
         cv::Mat& ipm = pis.img_ipm;
 
-        cpl_ -> update_homo(pis.pitch, pis.roll, 0.0);
+        cpl_ -> update_homo(pis.pitch, pis.roll, 0.0, pis.z);
 
         ipm = cv::Mat::zeros(g_params_.BEV_H_, g_params_.BEV_W_, CV_8UC3);
         cv::Mat tmp(g_params_.BEV_H_, g_params_.BEV_W_, CV_8UC3);
@@ -308,11 +308,12 @@ public:
         img_left.copyTo(big_img(cv::Rect(0, svc_h+122, svc_w, svc_h)), svc_mask);
         img_rear.copyTo(big_img(cv::Rect(svc_w+10, DMPR_H_+svc_h+20, svc_w, svc_h)), svc_mask);
         img_right.copyTo(big_img(cv::Rect(DMPR_W_+svc_w+20, svc_h+122, svc_w, svc_h)), svc_mask);
+        img_ipm = big_img;
 #endif
         std_msgs::Header header;
         header.frame_id = "world";
         header.stamp = ros::Time(t);
-        sensor_msgs::ImagePtr imgIpmMsg = cv_bridge::CvImage(header, "bgr8", big_img).toImageMsg();
+        sensor_msgs::ImagePtr imgIpmMsg = cv_bridge::CvImage(header, "bgr8", img_ipm).toImageMsg();
         pub_image_ipm_.publish(imgIpmMsg);
     }
 

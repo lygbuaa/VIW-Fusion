@@ -16,29 +16,29 @@ output_path: "output"
 dataset_path: "dataset"
 car_top_image_path: "apa_node/assets/car_top.png"
 
-image_width: 1920
-image_height: 1080
+image_width: 1280
+image_height: 720
 
 bev_h: 512
 bev_w: 512
-bev_xmax: 18.0
-bev_ymax: 18.0
+bev_xmax: 16.0
+bev_ymax: 16.0
 
 k_svc_34: !!opencv-matrix
   rows: 3
   cols: 4
   dt: d
-  data: [554.256,  0.0,     960.0,    0.0,
-         0.0,      554.256, 540.0,    0.0,
+  data: [369.504,  0.0,     640.0,    0.0,
+         0.0,      369.504, 360.0,    0.0,
          0.0,      0.0,     1.0,      0.0]
 
 t_svc_front_31: !!opencv-matrix
   rows: 3
   cols: 1
   dt: d
-  data: [1.20,
+  data: [1.10,
          0.0,
-         0.65]
+         1.00]
 
 t_svc_left_31: !!opencv-matrix
   rows: 3
@@ -46,15 +46,15 @@ t_svc_left_31: !!opencv-matrix
   dt: d
   data: [0.0,
          -0.74,
-         0.65]
+         1.00]
 
 t_svc_rear_31: !!opencv-matrix
   rows: 3
   cols: 1
   dt: d
-  data: [-1.20,
+  data: [-1.10,
          0.0,
-         0.65]
+         1.00]
 
 t_svc_right_31: !!opencv-matrix
   rows: 3
@@ -62,7 +62,7 @@ t_svc_right_31: !!opencv-matrix
   dt: d
   data: [0.0,
          0.74,
-         0.65]
+         1.00]
 
 euler_svc_front_31: !!opencv-matrix
   rows: 3
@@ -103,37 +103,5 @@ r0_cam_to_body: !!opencv-matrix
   data: [0.0,  0.0,  1.0,
          1.0,  0.0,  0.0,
          0.0,  -1.0, 0.0]
-
-homo_svc_front: !!opencv-matrix
-  rows: 3
-  cols: 3
-  dt: d
-  data: [5.77350558e-02,  8.34664736e-01, -3.37765457e+02,
-        -0.00000000e+00,  7.62598165e-01, -2.92015727e+02,
-        -0.00000000e+00,  2.60832730e-03, -8.82311887e-01]
-
-homo_svc_left: !!opencv-matrix
-  rows: 3
-  cols: 3
-  dt: d
-  data: [-1.69336509e-16,  7.92646097e-01, -3.02179960e+02,
-         -5.77350558e-02,  8.34664736e-01, -2.26914150e+02,
-         -5.58192992e-19,  2.60832730e-03, -8.82311887e-01]
-
-homo_svc_rear: !!opencv-matrix
-  rows: 3
-  cols: 3
-  dt: d
-  data: [-5.77350558e-02,  8.34664736e-01, -2.26914150e+02,
-         -7.07050512e-18,  9.06731307e-01, -2.72663881e+02,
-         -1.43343393e-35,  2.60832730e-03, -8.82311887e-01]
-
-homo_svc_right: !!opencv-matrix
-  rows: 3
-  cols: 3
-  dt: d
-  data: [1.34306179e-16,  8.76683376e-01, -2.62499648e+02,
-         5.77350558e-02,  8.34664736e-01, -3.37765457e+02,
-         4.58738899e-19,  2.60832730e-03, -8.82311887e-01]
 
 delay_svc_right: 0.0
