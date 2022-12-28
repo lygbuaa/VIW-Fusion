@@ -158,6 +158,10 @@ public:
 
     /* only useful in carla.town04 */
     bool marking_point_invalid_direction(MarkingPoint_t& mp){
+        /* only filter T type */
+        if(mp.type != 'T'){
+            return false;
+        }
         float dir_diff = round_direction(mp.direction - ego_yaw_);
         return fabs((fabs(dir_diff) - M_PI/2.0f)) > M_PI/8.0f;
     }
