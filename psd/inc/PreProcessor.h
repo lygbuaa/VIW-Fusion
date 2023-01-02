@@ -104,31 +104,81 @@ public:
         return array;
     }
 
-#if 0
-    // cv::dnn::blobFromImage() only avaliable on opencv 3.4+
-    static std::vector<float> mat2nchw(const cv::Mat& img, const int outh, const int outw){
-        cv::Mat blob = cv::dnn::blobFromImage(img, 1.0f/255, cv::Size(outw, outh), cv::Scalar(0, 0, 0), false, false);
-        return std::vector<float>(blob.reshape(1, 1));
-    }
-#endif
-
     /* use cv::dnn::blobFromImage() instead */
-    static void hwc2chw(const std::vector<float>& input, const size_t h, const size_t w, const size_t c, std::vector<float>& output){
+    template <typename IN_T, typename OUT_T>
+    static void hwc2chw(const std::vector<IN_T>& input, const size_t h, const size_t w, const size_t c, std::vector<OUT_T>& output, const float scale=1.0f){
         const size_t stride = h*w;
         output.resize(h*w*c);
         for(size_t i=0; i<stride; ++i){
             for(size_t j=0; j<c; ++j){
-                output[j*stride+i] = input[i*3+j];
+                output[j*stride+i] = (OUT_T)(input[i*3+j] * scale);
             }
         }
     }
 
-    static void dmpr_preprocess(const cv::Mat& img, const size_t h, const size_t w, std::vector<float>& output){
+    static void dmpr_onnx_preprocess(const cv::Mat& img, const size_t h, const size_t w, std::vector<float>& output){
         HANG_STOPWATCH();
         const size_t c = img.channels();
         std::vector<float> vec_hwc(normalize(resize(img, w, h)).reshape(1, 1));
-        hwc2chw(vec_hwc, h, w, c, output);
+        hwc2chw<float, float>(vec_hwc, h, w, c, output, 1.0f);
     }
+
+    /* aipu support uint8 and uint16 */
+    template <typename T>
+    static void dmpr_aipu_preprocess(const cv::Mat& img, const size_t h, const size_t w, std::vector<T>& output, const float scale=1.0f){
+        HANG_STOPWATCH();
+        const size_t c = img.channels();
+        std::vector<uint8_t> vec_hwc(resize(img, w, h).reshape(1, 1));
+        /* raw image is always uint8_t, but output could be uint16_t, need a scale: 65535/255 */
+        hwc2chw<uint8_t, T>(vec_hwc, h, w, c, output, scale);
+    }
+
+#if 0
+    // cv::dnn::blobFromImage() only avaliable on opencv 3.4+
+    /* support type: uint8_t, uint16_t, float */
+    template <typename T>
+    static void dmpr_aipu_preprocess_v2(const cv::Mat& img, const int outh, const int outw, std::vector<T>& output, const float scale=1.0f){
+        HANG_STOPWATCH();
+        /* Scaling is not supported for CV_8U blob depth */
+        cv::Mat blob = cv::dnn::blobFromImage(img, scale, cv::Size(outw, outh), cv::Scalar(0, 0, 0), false, false, CV_32F);
+        if(std::is_same<T, uint8_t>::value){
+            blob.convertTo(blob, CV_8U);
+        }else if(std::is_same<T, uint16_t>::value){
+            blob.convertTo(blob, CV_16U);
+        }else if(std::is_same<T, float>::value){
+            /* do nothing for float */
+        }else{
+            fprintf(stderr, "invalid output type!\n");
+            abort();
+        }
+        // return std::vector<T>(blob.reshape(1, 1));
+        output = std::move(std::vector<T>(blob.reshape(1, 1)));
+    }
+
+    // cv::dnn::blobFromImage() only avaliable on opencv 3.4+
+    /* support type: uint8_t, uint16_t, float */
+    template <typename T>
+    static void dmpr_aipu_preprocess_v3(const cv::Mat& img, const int outh, const int outw, std::vector<T>& output, const float scale=1.0f){
+        HANG_STOPWATCH();
+        
+        cv::Mat blob;
+        if(std::is_same<T, uint8_t>::value){
+            /* Scaling is not supported for CV_8U blob depth, must be 1.0f */
+            blob = cv::dnn::blobFromImage(img, 1.0f, cv::Size(outw, outh), cv::Scalar(0, 0, 0), false, false, CV_8U);
+        }else if(std::is_same<T, uint16_t>::value){
+            blob = cv::dnn::blobFromImage(img, scale, cv::Size(outw, outh), cv::Scalar(0, 0, 0), false, false, CV_32F);
+            blob.convertTo(blob, CV_16U);
+        }else if(std::is_same<T, float>::value){
+            blob = cv::dnn::blobFromImage(img, scale, cv::Size(outw, outh), cv::Scalar(0, 0, 0), false, false, CV_32F);
+        }else{
+            fprintf(stderr, "invalid output type!\n");
+            abort();
+        }
+        // return std::vector<T>(blob.reshape(1, 1));
+        output = std::move(std::vector<T>(blob.reshape(1, 1)));
+    }
+
+#endif
 
 };
 

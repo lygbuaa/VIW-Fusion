@@ -67,7 +67,7 @@ public:
         /* preprocess */
         const int h = img.rows;
         const int w = img.cols;
-        PreProcessor::dmpr_preprocess(img, DMPR_H_, DMPR_W_, g_input_vec_fp32_);
+        PreProcessor::dmpr_onnx_preprocess(img, DMPR_H_, DMPR_W_, g_input_vec_fp32_);
 
         HANG_STOPWATCH();
         /* prepare input data */
