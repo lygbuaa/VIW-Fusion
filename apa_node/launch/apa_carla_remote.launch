@@ -1,0 +1,6 @@
+<launch>
+    <node name="rvizvisualisation" pkg="rviz" type="rviz" output="log" args="-d $(find apa_node)/../config/avp_rviz_config.rviz" />
+    <node name="ApaNode" pkg="apa_node" type="apa_node_bin" output="screen" args="/home/hugoliu/github/catkin_ws/src/VIW-Fusion/config/carla/apa_town04_microlino.yaml">
+        <param name="data_source_apa" value="remote"/>
+    </node>
+</launch>

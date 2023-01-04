@@ -1,0 +1,8 @@
+[Unit]
+Description=ros_daemon_service.
+
+[Service]
+ExecStart=/bin/bash /home/hugoliu/github/catkin_ws/src/VIW-Fusion/daemon_node/tools/run_daemon_node.sh
+
+[Install]
+WantedBy=multi-user.target

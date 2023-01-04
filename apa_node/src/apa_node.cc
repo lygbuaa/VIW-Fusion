@@ -23,6 +23,7 @@
 #include <nav_msgs/Path.h>
 #include <geometry_msgs/PointStamped.h>
 #include <visualization_msgs/Marker.h>
+#include <std_msgs/Int32.h>
 #include <opencv2/opencv.hpp>
 #include "DmprWrapper.h"
 #include "JsonDataset.h"
@@ -31,38 +32,42 @@
 
 IPM_PARAMS_t g_params_;
 std::queue<sensor_msgs::ImuConstPtr> imu_buf_;
-std::mutex m_buf_;
+// std::mutex m_buf_;
 std::unique_ptr<IpmComposer> g_ipm_composer_;
 std::unique_ptr<psdonnx::DmprWrapper> g_dmpr_wrapper_;
 // std::unique_ptr<psdonnx::JsonDataset> g_json_dataset_;
 std::shared_ptr<CvParamLoader> g_param_loader_;
-bool g_exit_ = false;
+// bool g_exit_ = false;
 ros::Publisher g_pub_ego_path_;
 nav_msgs::Path g_ego_path_;
+ros::Publisher g_heartbeat_;
 
 void img_front_callback(const sensor_msgs::ImageConstPtr &img_msg)
 {
-    std::unique_lock<std::mutex> lock(m_buf_);
+    static int64_t counter = 0;
+    // std::unique_lock<std::mutex> lock(m_buf_);
     g_ipm_composer_ -> PushImage(SvcIndex_t::FRONT, img_msg);
+    ROS_INFO("image front recv counter: %ld", counter);
+    counter += 1;
 }
 
 void img_left_callback(const sensor_msgs::ImageConstPtr &img_msg)
 {
-    std::unique_lock<std::mutex> lock(m_buf_);
+    // std::unique_lock<std::mutex> lock(m_buf_);
     g_ipm_composer_ -> PushImage(SvcIndex_t::LEFT, img_msg);
     // ROS_INFO("input frame svc left");
 }
 
 void img_rear_callback(const sensor_msgs::ImageConstPtr &img_msg)
 {
-    std::unique_lock<std::mutex> lock(m_buf_);
+    // std::unique_lock<std::mutex> lock(m_buf_);
     g_ipm_composer_ -> PushImage(SvcIndex_t::REAR, img_msg);
     // ROS_INFO("input frame svc rear");
 }
 
 void img_right_callback(const sensor_msgs::ImageConstPtr &img_msg)
 {
-    std::unique_lock<std::mutex> lock(m_buf_);
+    // std::unique_lock<std::mutex> lock(m_buf_);
     // g_ipm_composer_ -> PushImage(SvcIndex_t::RIGHT, g_ipm_composer_->CompensateImageMsg(img_msg, DELAY_SVC_RIGHT_S_));
     g_ipm_composer_ -> PushImage(SvcIndex_t::RIGHT, img_msg);
     // ROS_INFO("input frame svc right");
@@ -70,10 +75,13 @@ void img_right_callback(const sensor_msgs::ImageConstPtr &img_msg)
 
 void wheel_callback(const nav_msgs::OdometryConstPtr &odom_msg)
 {
+    static int64_t counter = 0;
+    ROS_INFO("odom recv counter: %ld", counter);
+    counter += 1;
     static float W0X_ = (psdonnx::CARLA_WX_FENCE_[0] + psdonnx::CARLA_WX_FENCE_[1]) * 0.5f;
     static float W0Y_ = (psdonnx::CARLA_WY_FENCE_[0] + psdonnx::CARLA_WY_FENCE_[1]) * 0.5f;
 
-    std::unique_lock<std::mutex> lock(m_buf_);
+    // std::unique_lock<std::mutex> lock(m_buf_);
     g_ipm_composer_ -> PushOdom(odom_msg);
 
     /* pub groudtruth ego path */
@@ -114,6 +122,21 @@ void wheel_callback(const nav_msgs::OdometryConstPtr &odom_msg)
     return;
 }
 
+void heartbeat_process(){
+    ROS_INFO("heartbeat_process launch");
+    int32_t counter = 0;
+    while(ros::ok()){
+        std_msgs::Int32 msg;
+        msg.data = counter;
+        g_heartbeat_.publish(msg);
+        ROS_INFO("heartbeat counter: %d", counter);
+        std::chrono::milliseconds dura(1000);
+        std::this_thread::sleep_for(dura);
+        counter += 1;
+    }
+    ROS_INFO("heartbeat_process exit");
+}
+
 // extract images with same timestamp from svc topics
 void sync_process()
 {
@@ -122,14 +145,16 @@ void sync_process()
     cv::Mat image_front, image_left, image_rear, image_right, image_ipm;
     double last_time = 0.0f;
     SvcPairedImages_t pis;
-    while(!g_exit_)
+    int64_t counter = 0;
+    while(ros::ok())
     {
         std_msgs::Header header;
         double time = -1.0f;
+#if 1
         // m_buf.lock();
         if(!g_ipm_composer_->IsEmpty())
         {
-            std::unique_lock<std::mutex> lock(m_buf_);
+            // std::unique_lock<std::mutex> lock(m_buf_);
             SvcIndex_t idx = g_ipm_composer_ -> RemoveOutdateFrame();
 
             if(idx != SvcIndex_t::VOID){
@@ -152,8 +177,6 @@ void sync_process()
         // m_buf.unlock();
         if(time > 0.0f){
             last_time = time;
-            /* send paired images into estimator */
-            //estimator.inputImage(time, image0, image1);
             time = -1.0f;
 	        psdonnx::Detections_t det;
 	        std::string psd_save_path = g_param_loader_->output_path_ + "/" + std::to_string(pis.time) + "_psd.png";
@@ -161,9 +184,11 @@ void sync_process()
 	        g_dmpr_wrapper_ -> run_model(pis, det, true);
             g_ipm_composer_ -> PubIpmImage(pis, pis.time);
         }
-
-        std::chrono::milliseconds dura(5);
+#endif
+        std::chrono::milliseconds dura(20);
         std::this_thread::sleep_for(dura);
+        // ROS_INFO("sync_process counter: %ld", counter);
+        // counter += 1;
     }
     ROS_INFO("svc camera sync process exit");
 }
@@ -201,6 +226,8 @@ int main(int argc, char **argv)
     std::string config_file_path = argv[1];
     ROS_INFO("config_file_path: %s\n", argv[1]);
 
+    g_heartbeat_ = n.advertise<std_msgs::Int32>("apa_node_heartbeat", 10);
+
     // readParameters(config_file);
     // estimator.setParameter();
 
@@ -232,8 +259,10 @@ int main(int argc, char **argv)
     // ros::Subscriber sub_imu = n.subscribe(IMU_TOPIC, 2000, imu_callback, ros::TransportHints().tcpNoDelay());
     ros::Subscriber sub_wheel = n.subscribe(g_param_loader_->wheel_topic_, 100, wheel_callback, ros::TransportHints().tcpNoDelay());
     std::thread sync_thread{sync_process};
+    std::thread heartbeat_thread{heartbeat_process};
     ros::spin();
-    g_exit_ = true;
+    // g_exit_ = true;
     sync_thread.join();
+    heartbeat_thread.join();
     return 0;
 }

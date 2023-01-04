@@ -1,0 +1,10 @@
+<launch>
+  <!-- data_source: "local" or "remote" -->
+  <arg name="data_source_apa" default="local"/>
+  <arg name="data_source_l2" default="remote"/>
+
+  <node pkg="daemon_node" name="ros_daemon_node" type="daemon_node.py" output="screen" required="true">
+    <param name="data_source_apa" value="$(arg data_source_apa)"/>
+    <param name="data_source_l2" value="$(arg data_source_l2)"/>
+  </node>
+</launch>

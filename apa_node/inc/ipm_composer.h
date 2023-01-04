@@ -49,6 +49,8 @@ public:
     float W0X_ = 0.0f;
     float W0Y_ = 0.0f;
     std::shared_ptr<CvParamLoader> cpl_;
+    std::mutex image_mutex_;
+    std::mutex odom_mutex_;
 
 private:
     ros::Publisher pub_image_ipm_;
@@ -129,6 +131,7 @@ public:
 
     //Eigen::Quaterniond& quat, Eigen::Vector3d& loc
     void PushOdom(const nav_msgs::OdometryConstPtr &odom_msg){
+        std::unique_lock<std::mutex> lock(odom_mutex_);
         odom_buf_ptr_ -> push(odom_msg);
         if(odom_buf_ptr_->size() > BUFFER_MAX_*3){
             odom_buf_ptr_ -> pop();
@@ -136,6 +139,7 @@ public:
     }
 
     void PushImage(SvcIndex_t idx, const sensor_msgs::ImageConstPtr& img_msg){
+        std::unique_lock<std::mutex> lock(image_mutex_);
         svc_bufs_[idx] -> push(img_msg);
         if(svc_bufs_[idx]->size() > BUFFER_MAX_){
             svc_bufs_[idx] -> pop();
@@ -143,6 +147,7 @@ public:
     }
 
     void PopImage(SvcIndex_t idx){
+        std::unique_lock<std::mutex> lock(image_mutex_);
         if(idx >= SvcIndex_t::FRONT && idx <=SvcIndex_t::RIGHT){
             svc_bufs_[idx] -> pop();
         }else if(idx == SvcIndex_t::ALL){
@@ -175,13 +180,17 @@ public:
 
     /* call this function after RemoveOutdateFrame */
     void GetSyncImages(SvcPairedImages_t& paired_images){
-        paired_images.time = svc_front_buf_ptr_->front()->header.stamp.toSec();
-        paired_images.img_front = GetImageFromMsg(svc_front_buf_ptr_->front());
-        paired_images.img_left = GetImageFromMsg(svc_left_buf_ptr_->front());
-        paired_images.img_rear = GetImageFromMsg(svc_rear_buf_ptr_->front());
-        paired_images.img_right = GetImageFromMsg(svc_right_buf_ptr_->front());
+        {
+            std::unique_lock<std::mutex> lock(image_mutex_);
+            paired_images.time = svc_front_buf_ptr_->front()->header.stamp.toSec();
+            paired_images.img_front = GetImageFromMsg(svc_front_buf_ptr_->front());
+            paired_images.img_left = GetImageFromMsg(svc_left_buf_ptr_->front());
+            paired_images.img_rear = GetImageFromMsg(svc_rear_buf_ptr_->front());
+            paired_images.img_right = GetImageFromMsg(svc_right_buf_ptr_->front());
+        }
 
         while(!odom_buf_ptr_->empty()){
+            std::unique_lock<std::mutex> lock(odom_mutex_);
             auto odom_msg = odom_buf_ptr_->front();
             double t = odom_msg->header.stamp.toSec();
             if (t < paired_images.time-DT_THRESHOLD_SEC_){
