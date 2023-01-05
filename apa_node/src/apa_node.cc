@@ -26,7 +26,6 @@
 #include <std_msgs/Int32.h>
 #include <opencv2/opencv.hpp>
 #include "DmprWrapper.h"
-#include "JsonDataset.h"
 #include "CvParamLoader.h"
 #include "ipm_composer.h"
 
@@ -35,7 +34,6 @@ std::queue<sensor_msgs::ImuConstPtr> imu_buf_;
 // std::mutex m_buf_;
 std::unique_ptr<IpmComposer> g_ipm_composer_;
 std::unique_ptr<psdonnx::DmprWrapper> g_dmpr_wrapper_;
-// std::unique_ptr<psdonnx::JsonDataset> g_json_dataset_;
 std::shared_ptr<CvParamLoader> g_param_loader_;
 // bool g_exit_ = false;
 ros::Publisher g_pub_ego_path_;
@@ -141,7 +139,6 @@ void heartbeat_process(){
 void sync_process()
 {
     ROS_INFO("svc camera sync process launch");
-    //g_json_dataset_ -> init_writer();
     cv::Mat image_front, image_left, image_rear, image_right, image_ipm;
     double last_time = 0.0f;
     SvcPairedImages_t pis;
@@ -169,7 +166,6 @@ void sync_process()
                 // }
                 // g_ipm_composer_ -> Compose(pis, true, g_param_loader_->output_path_);
                 g_ipm_composer_ -> Compose(pis, false);
-		        // g_json_dataset_ -> feed(pis.time, pis.img_front, pis.img_left, pis.img_right, pis.img_rear);
                 g_ipm_composer_ -> PopImage(SvcIndex_t::ALL);
                 // ROS_INFO("get sync images, ts_front: %f", time);
             }
@@ -246,7 +242,6 @@ int main(int argc, char **argv)
     g_dmpr_wrapper_ -> load_model(g_param_loader_->dmpr_model_path_);
     g_dmpr_wrapper_ -> init_pub_parklots(n);
     // g_dmpr_wrapper_ -> test();
-    // g_json_dataset_ = std::unique_ptr<psdonnx::JsonDataset>(new psdonnx::JsonDataset(g_param_loader_->output_path_));
 
     g_pub_ego_path_ = n.advertise<nav_msgs::Path>("ego_path", 1000);
     ros::Subscriber sub_img_front = n.subscribe(g_param_loader_->image_front_topic_, 100, img_front_callback);

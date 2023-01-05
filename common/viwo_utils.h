@@ -53,6 +53,12 @@ public:
         return os.str();
     }
 
+    static void MakeDir(std::string path){
+        std::string cmd = "mkdir -p " + path;
+        int32_t exit_code = system(cmd.c_str());
+        ROS_WARN("ShellCall (%s) exit code: %d", cmd.c_str(), exit_code);
+    }
+
 };
 
 #endif

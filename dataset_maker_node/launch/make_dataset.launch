@@ -1,0 +1,6 @@
+<launch>
+    <node name="DatasetMakerNode" pkg="dataset_maker_node" type="dataset_maker_node_bin" output="screen" args="/home/hugoliu/github/catkin_ws/src/VIW-Fusion/dataset_maker_node/config/data_maker_apa.yaml">
+        <!-- action: "make" or "play" -->
+        <param name="action" value="make"/>
+    </node>
+</launch>

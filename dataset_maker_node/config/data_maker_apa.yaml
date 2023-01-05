@@ -1,0 +1,35 @@
+%YAML:1.0
+
+#common parameters
+node_rootdir: "/home/hugoliu/github/catkin_ws/src/VIW-Fusion/dataset_maker_node"
+
+svc_front_topic: "/carla/ego_vehicle/camera_svc_front/image"
+svc_left_topic: "/carla/ego_vehicle/camera_svc_left/image"
+svc_rear_topic: "/carla/ego_vehicle/camera_svc_rear/image"
+svc_right_topic: "/carla/ego_vehicle/camera_svc_right/image"
+
+odom_topic: "/carla/ego_vehicle/odometry"
+
+# cv::IMWRITE_PNG_COMPRESSION,  0~9, higher value means smaller size and longer compression time.
+cv_png_compression_level: 0
+
+output_root_path: "output"
+# write json lines to this file
+output_json_file: "dataset.json"
+# write png images to these dir
+output_svc_front_path: "camera_svc_front"
+output_svc_left_path: "camera_svc_left"
+output_svc_rear_path: "camera_svc_rear"
+output_svc_right_path: "camera_svc_right"
+# write odom json files to these dir
+output_odom_path: "odom"
+
+# write: 0, read: 1
+write_or_read: 0
+
+# sensor timestamp delay, relative to odom, in sec.
+delay_odom: 0.0
+delay_svc_front: 0.0
+delay_svc_left: 0.0
+delay_svc_rear: 0.0
+delay_svc_right: 0.0
