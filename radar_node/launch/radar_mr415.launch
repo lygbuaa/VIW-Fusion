@@ -1,0 +1,6 @@
+<launch>
+    <!-- <node name="rvizvisualisation" pkg="rviz" type="rviz" output="log" args="-d $(find apa_node)/../config/avp_rviz_config.rviz" /> -->
+    <node name="Radar415Node" pkg="radar_node" type="radar_node_bin" output="screen" args="$(find radar_node)/config/radar_mr415.yaml">
+        <!-- <param name="data_source" value="local"/> -->
+    </node>
+</launch>

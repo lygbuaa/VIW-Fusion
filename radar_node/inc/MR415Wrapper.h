@@ -1,0 +1,142 @@
+#pragma once
+#include "SocketCanWrapper.h"
+#include "viwo_utils.h"
+#include "radar_node/RadarTarget.h"
+#include "radar_node/RadarDetection.h"
+
+namespace radar{
+/* defined canid */
+constexpr static unsigned int CANID_HEADER = 0x500;
+constexpr static unsigned int CANID_TARGET_A = 0x503;
+constexpr static unsigned int CANID_TARGET_B = 0x504;
+
+struct FrameHeader_t{
+    unsigned int canid = CANID_HEADER;
+    /* No_Obj: start=2, len=6 */
+    int no_obj = -1;
+    /* TunnelFlag: start=0, len=1 */
+    int tunnel_flag = -1;
+    /* CIPV_ID: start=16, len=8 */
+    int cipv_id = -1;
+    /* ACC_CIPV_ID: start=24, len=8 */
+    int acc_cipv_id = -1;
+    /* AEB_CIPV_ID: start=32, len=8 */
+    int aeb_cipv_id = -1;
+    /* Func_Status: start=8, len=8 */
+    int func_status = -1;
+    /* Radar_Frame: start=56, len=16 */
+    int radar_frame = -1;
+};
+
+struct FrameTargetA_t{
+    unsigned int canid = CANID_TARGET_A;
+    /* Target1_MsgCnt_A: start=56, len=2 */
+    int msgcnt_a = -1;
+    /* Target1_ID: start=48, len=8 */
+    int id = -1;
+    /* Target1_Pos_X: start=12, len=12, Offset=0m, Resolution=0.125m */
+    float px = 0.0f;
+    /* Target1_Pos_Y: start=16, len=12, Offset=0m, Resolution=0.125m */
+    float py = 0.0f;
+    /* Target1_Vel_X: start=36, len=12, Offset=-102m/s, Resolution=0.05m/s */
+    float vx = 0.0f;
+    /* Target1_Vel_Y: start=40, len=12, Offset=-102m/s, Resolution=0.05m/s */
+    float vy = 0.0f;
+    /* Target1_CIPVFlag: start=59, len=1 */
+    int cipv_flag = -1;
+    /* Target1_ACC_CIPVFlag: start=63, len=1 */
+    int acc_cipv_flag = -1;
+    /* Target1_AEB_CIPVFlag: start=62, len=1 */
+    int aeb_cipv_flag = -1;
+};
+
+struct FrameTargetB_t{
+    unsigned int canid = CANID_TARGET_B;
+    /* Target1_MsgCnt_B: start=56, len=2 */
+    int msgcnt_b = -1;
+    /* Target1_ID: start=16, len=8 */
+    int id = -1;
+    /* Target1_Accel_X: start=12, len=12, Offset=-40m/s^2, Resolution=0.04m/s^2 */
+    float ax = 0.0f;
+    /* Target1_MeasStat: start=29, len=3 */
+    int meas_stat = -1;
+    /* Target1_DynProp: start=24, len=3 */
+    int dyn_prop = -1;
+    /* Target1_ProbOfExist: start=48, len=2 */
+    int prob_exist = -1;
+    /* Target1_Type: start=58, len=6, 0=unknow, 1=pedestrian, 2=bike, 3=car, 4=truck */
+    int type = -1;
+};
+
+class RadarMR415 : public SocketCanClassical
+{
+private:
+    volatile bool alive_ = false;
+    std::unique_ptr<std::thread> pworker_ = nullptr;
+
+
+public:
+    RadarMR415(const std::string can_name)
+    : SocketCanClassical(can_name)
+    {}
+
+    ~RadarMR415(){}
+
+    void start_listening(){
+        alive_ = true;
+        pworker_ = std::unique_ptr<std::thread> (new std::thread(&RadarMR415::recv_loop, this));
+    }
+
+    void stop_listening(){
+        alive_ = false;
+        pworker_ -> join();
+    }
+
+    void process_frame_header(const CanFrameClassical_t& frame){
+        HANG_STOPWATCH();
+        radar_node::RadarDetection det;
+
+    }
+
+    void process_frame_target_a(const CanFrameClassical_t& frame){
+        HANG_STOPWATCH();
+        radar_node::RadarTarget target;
+    }
+
+    void process_frame_target_b(const CanFrameClassical_t& frame){
+        HANG_STOPWATCH();
+    }
+
+    void recv_loop(){
+        ROS_INFO("start listening to MR415");
+        while(alive_){
+            /* read frame */
+            CanFrameClassical_t frame;
+            if(recv_frame(frame) < 0){
+                // ROS_WARN("read frame error!");
+                std::chrono::milliseconds dura(50);
+                continue;
+            }
+            /* process frame */
+            switch(frame.can_id){
+                case CANID_HEADER:
+                    process_frame_header(frame);
+                    break;
+                case CANID_TARGET_A:
+                    process_frame_target_a(frame);
+                    break;
+                case CANID_TARGET_B:
+                    process_frame_target_b(frame);
+                    break;
+                default:
+                    ROS_WARN("unsupported canid: 0x%03X", frame.can_id);
+            }
+
+        }
+        ROS_INFO("stop listening to MR415");
+    }
+
+};
+
+
+}
