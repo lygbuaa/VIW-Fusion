@@ -1,4 +1,4 @@
-uint32 id   #object id
+int32 id   #object id
 float32 px  #position of x, meter
 float32 py  #position of y, meter
 float32 vx  #velocity of x, m/s

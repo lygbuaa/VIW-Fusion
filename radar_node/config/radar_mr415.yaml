@@ -40,30 +40,6 @@ t_svc_front_31: !!opencv-matrix
          0.0,
          1.00]
 
-t_svc_left_31: !!opencv-matrix
-  rows: 3
-  cols: 1
-  dt: d
-  data: [0.0,
-         -0.74,
-         1.00]
-
-t_svc_rear_31: !!opencv-matrix
-  rows: 3
-  cols: 1
-  dt: d
-  data: [-1.10,
-         0.0,
-         1.00]
-
-t_svc_right_31: !!opencv-matrix
-  rows: 3
-  cols: 1
-  dt: d
-  data: [0.0,
-         0.74,
-         1.00]
-
 euler_svc_front_31: !!opencv-matrix
   rows: 3
   cols: 1
@@ -71,37 +47,3 @@ euler_svc_front_31: !!opencv-matrix
   data: [20.0,
          0.0,
          0.0]
-
-euler_svc_left_31: !!opencv-matrix
-  rows: 3
-  cols: 1
-  dt: d
-  data: [20.0,
-         0.0,
-         90.0]
-
-euler_svc_rear_31: !!opencv-matrix
-  rows: 3
-  cols: 1
-  dt: d
-  data: [20.0,
-         0.0,
-         180.0]
-
-euler_svc_right_31: !!opencv-matrix
-  rows: 3
-  cols: 1
-  dt: d
-  data: [20.0,
-         0.0,
-         270.0]
-
-r0_cam_to_body: !!opencv-matrix
-  rows: 3
-  cols: 3
-  dt: d
-  data: [0.0,  0.0,  1.0,
-         1.0,  0.0,  0.0,
-         0.0,  -1.0, 0.0]
-
-delay_svc_right: 0.0

@@ -49,7 +49,7 @@ void heartbeat_process(){
 int main(int argc, char **argv)
 {
     ros::init(argc, argv, "ros_radar_node");
-    ros::NodeHandle n("~");
+    ros::NodeHandle nh("~");
     ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug);
 
     if(argc != 2)
@@ -61,7 +61,7 @@ int main(int argc, char **argv)
     std::string config_file_path = argv[1];
     ROS_INFO("config_file_path: %s\n", argv[1]);
 
-    g_heartbeat_ = n.advertise<std_msgs::Int32>("radar_node_heartbeat", 10);
+    g_heartbeat_ = nh.advertise<std_msgs::Int32>("radar_node_heartbeat", 10);
     std::thread heartbeat_thread{heartbeat_process};
 
     // readParameters(config_file);
@@ -70,7 +70,7 @@ int main(int argc, char **argv)
     // g_param_loader_ = std::shared_ptr<CvParamLoader> (new CvParamLoader(config_file_path));
 
     std::unique_ptr<radar::RadarMR415> ptr_radar(new radar::RadarMR415("vcan0"));
-    ptr_radar -> start_listening();
+    ptr_radar -> start_listening(nh);
     ROS_WARN("waiting for socketcan msg");
 
     ros::spin();

@@ -1,4 +1,7 @@
 #pragma once
+
+#include <visualization_msgs/Marker.h>
+#include <visualization_msgs/MarkerArray.h>
 #include "SocketCanWrapper.h"
 #include "viwo_utils.h"
 #include "radar_node/RadarTarget.h"
@@ -11,7 +14,7 @@ constexpr static unsigned int CANID_TARGET_A = 0x503;
 constexpr static unsigned int CANID_TARGET_B = 0x504;
 
 struct FrameHeader_t{
-    unsigned int canid = CANID_HEADER;
+    const unsigned int canid = CANID_HEADER;
     /* No_Obj: start=2, len=6 */
     int no_obj = -1;
     /* TunnelFlag: start=0, len=1 */
@@ -29,7 +32,7 @@ struct FrameHeader_t{
 };
 
 struct FrameTargetA_t{
-    unsigned int canid = CANID_TARGET_A;
+    const unsigned int canid = CANID_TARGET_A;
     /* Target1_MsgCnt_A: start=56, len=2 */
     int msgcnt_a = -1;
     /* Target1_ID: start=48, len=8 */
@@ -51,7 +54,7 @@ struct FrameTargetA_t{
 };
 
 struct FrameTargetB_t{
-    unsigned int canid = CANID_TARGET_B;
+    const unsigned int canid = CANID_TARGET_B;
     /* Target1_MsgCnt_B: start=56, len=2 */
     int msgcnt_b = -1;
     /* Target1_ID: start=16, len=8 */
@@ -73,7 +76,10 @@ class RadarMR415 : public SocketCanClassical
 private:
     volatile bool alive_ = false;
     std::unique_ptr<std::thread> pworker_ = nullptr;
-
+    radar_node::RadarDetection g_det_;
+    radar_node::RadarTarget g_target_;
+    ros::Publisher pub_detection_;
+    ros::Publisher pub_markers_;
 
 public:
     RadarMR415(const std::string can_name)
@@ -82,8 +88,10 @@ public:
 
     ~RadarMR415(){}
 
-    void start_listening(){
+    void start_listening(ros::NodeHandle& nh){
         alive_ = true;
+        pub_detection_ = nh.advertise<radar_node::RadarDetection>("mr415_detection", 100);
+        pub_markers_ = nh.advertise<visualization_msgs::MarkerArray>("mr415_markers", 100);
         pworker_ = std::unique_ptr<std::thread> (new std::thread(&RadarMR415::recv_loop, this));
     }
 
@@ -92,19 +100,143 @@ public:
         pworker_ -> join();
     }
 
-    void process_frame_header(const CanFrameClassical_t& frame){
-        HANG_STOPWATCH();
-        radar_node::RadarDetection det;
+    void publish_markers(){
+        visualization_msgs::MarkerArray markerArray_msg;
+        std_msgs::Header header;
+        /* map is the default frame_id */
+        header.frame_id = "map";
+        header.stamp = ros::Time(ros::Time::now().toSec());
 
+        visualization_msgs::Marker marker;
+        marker.header = header;
+        marker.id = 0;
+        // marker.text = std::to_string(obj.id);
+        marker.ns = "radar_node";
+        marker.type = visualization_msgs::Marker::ARROW;
+        marker.action = visualization_msgs::Marker::ADD;
+        marker.color.r = 0.0f;
+        marker.color.g = 0.0f;
+        marker.color.b = 1.0f;
+        marker.color.a = 1.0f;
+        /* markers last for 1.2 sec */
+        marker.lifetime = ros::Duration(0.0f);
+
+        marker.scale.x = 1.0f;
+        marker.scale.y = 0.2f;
+        marker.scale.z = 0.2f;
+        marker.pose.position.x = 0.0f;
+        marker.pose.position.y = 0.0f;
+        marker.pose.position.z = 0.0f;
+        marker.pose.orientation.w = 1.0;
+        marker.pose.orientation.x = 0.0;
+        marker.pose.orientation.y = 0.0;
+        marker.pose.orientation.z = 0.0;
+
+        markerArray_msg.markers.push_back(marker);
+
+        for(const radar_node::RadarTarget& obj : g_det_.objs){
+            visualization_msgs::Marker marker;
+            marker.header = header;
+            marker.id = obj.id;
+            // marker.text = std::to_string(obj.id);
+            marker.ns = "radar_node";
+            marker.type = visualization_msgs::Marker::CUBE;
+            marker.action = visualization_msgs::Marker::ADD;
+            marker.color.r = 1.0f;
+            marker.color.g = 0.0f;
+            marker.color.b = 0.0f;
+            marker.color.a = 1.0f;
+            /* markers last for 1.2 sec */
+            marker.lifetime = ros::Duration(0.0f);
+
+            marker.scale.x = 0.5f;
+            marker.scale.y = 0.5f;
+            marker.scale.z = 1.0f;
+            marker.pose.position.x = obj.px;
+            marker.pose.position.y = obj.py;
+            marker.pose.position.z = 0.0f;
+            marker.pose.orientation.w = 1.0;
+            marker.pose.orientation.x = 0.0;
+            marker.pose.orientation.y = 0.0;
+            marker.pose.orientation.z = 0.0;
+
+            markerArray_msg.markers.push_back(marker);
+        }
+        pub_markers_.publish(markerArray_msg);
+    }
+
+    /*
+        0x8F >> 4 = 0x08
+        0xFF >> 4 = 0x0F
+    */
+    void process_frame_header(const CanFrameClassical_t& frame){
+        // HANG_STOPWATCH();
+        FrameHeader_t frame_header;
+        assert(frame.can_id == frame_header.canid);
+        frame_header.no_obj = (int)(frame.data[0] >> 2);
+
+        /* publish detection of last cycle, filter empty no_obj in case of 0x503 comes first */
+        if(g_det_.no_obj > 0){
+            pub_detection_.publish(g_det_);
+            ROS_INFO("publish mr415_detection, no_obj = %d", g_det_.no_obj);
+            publish_markers();
+        }
+
+        /* clear detection */
+        g_det_.objs.clear();
+        std_msgs::Header header;
+        header.frame_id = "world";
+        header.stamp = ros::Time(ros::Time::now().toSec());
+
+        g_det_.header = header;
+        g_det_.no_obj = frame_header.no_obj;
     }
 
     void process_frame_target_a(const CanFrameClassical_t& frame){
-        HANG_STOPWATCH();
-        radar_node::RadarTarget target;
+        // HANG_STOPWATCH();
+        FrameTargetA_t frame_target_a;
+        frame_target_a.id = (int)(frame.data[6]);
+
+        unsigned int tmp = ((frame.data[0]&0xff)<<4) + ((frame.data[1]&0xf0)>>4);
+        frame_target_a.px = tmp * 0.125f;
+        // ROS_INFO("[target_a] id = %d, px = %.2f (%d)", frame_target_a.id, frame_target_a.px, tmp);
+
+        tmp &= 0x0;
+        tmp = ((frame.data[1]&0x0f)<<8) + (frame.data[2]&0xff);
+        frame_target_a.py = tmp * 0.125f - 128.0f;
+        // ROS_INFO("[target_a] id = %d, py = %.2f (%d)", frame_target_a.id, frame_target_a.py, tmp);
+
+        tmp &= 0x0;
+        tmp = ((frame.data[3]&0xff)<<4) + ((frame.data[4]&0xf0)>>4);
+        frame_target_a.vx = tmp * 0.05f - 102.0f;
+        // ROS_INFO("[target_a] id = %d, vx = %.2f (%d)", frame_target_a.id, frame_target_a.vx, tmp);
+
+        tmp &= 0x0;
+        tmp = ((frame.data[4]&0x0f)<<8) + (frame.data[5]&0xff);
+        frame_target_a.vy = tmp * 0.05f - 102.0f;
+        // ROS_INFO("[target_a] id = %d, vy = %.2f (%d)", frame_target_a.id, frame_target_a.vy, tmp);
+
+        g_target_.id = frame_target_a.id;
+        g_target_.px = frame_target_a.px;
+        g_target_.py = frame_target_a.py;
+        g_target_.vx = frame_target_a.vx;
+        g_target_.vy = frame_target_a.vy;
     }
 
     void process_frame_target_b(const CanFrameClassical_t& frame){
-        HANG_STOPWATCH();
+        // HANG_STOPWATCH();
+        FrameTargetB_t frame_target_b;
+        frame_target_b.id = (int)(frame.data[2]);
+        /* make sure target_b comes with the same target_a */
+        assert(g_target_.id == frame_target_b.id);
+
+        frame_target_b.type = (int)((frame.data[7]&0xfc)>>2);
+        // ROS_INFO("[target_b] id = %d, type = %d", frame_target_b.id, frame_target_b.type);
+
+        g_target_.type = frame_target_b.type;
+        ROS_INFO("add new target, id = %d, type = %d, px = %.2f, py = %.2f, vx = %.2f, vy = %.2f", \
+            g_target_.id, g_target_.type, g_target_.px, g_target_.py, g_target_.vx, g_target_.vy);
+        g_det_.objs.push_back(g_target_);
     }
 
     void recv_loop(){
