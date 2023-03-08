@@ -88,10 +88,10 @@ public:
 
     ~RadarMR415(){}
 
-    void start_listening(ros::NodeHandle& nh){
+    void start_listening(ros::NodeHandle& nh, const std::string det_topic="mr415_detection", const std::string marker_topic="mr415_markers"){
         alive_ = true;
-        pub_detection_ = nh.advertise<radar_node::RadarDetection>("mr415_detection", 100);
-        pub_markers_ = nh.advertise<visualization_msgs::MarkerArray>("mr415_markers", 100);
+        pub_detection_ = nh.advertise<radar_node::RadarDetection>(det_topic, 100);
+        pub_markers_ = nh.advertise<visualization_msgs::MarkerArray>(marker_topic, 100);
         pworker_ = std::unique_ptr<std::thread> (new std::thread(&RadarMR415::recv_loop, this));
     }
 
@@ -101,6 +101,13 @@ public:
     }
 
     void publish_markers(){
+        constexpr static float EGO_SIZE_X = 1.0f;
+        constexpr static float EGO_SIZE_Y = 0.2f;
+        constexpr static float EGO_SIZE_Z = 0.2f;
+        constexpr static float TARGET_SIZE_X = 0.5f;
+        constexpr static float TARGET_SIZE_Y = 0.5f;
+        constexpr static float TARGET_SIZE_Z = 1.0f;
+
         visualization_msgs::MarkerArray markerArray_msg;
         std_msgs::Header header;
         /* map is the default frame_id */
@@ -121,12 +128,12 @@ public:
         /* markers last for 1.2 sec */
         marker.lifetime = ros::Duration(0.0f);
 
-        marker.scale.x = 1.0f;
-        marker.scale.y = 0.2f;
-        marker.scale.z = 0.2f;
+        marker.scale.x = EGO_SIZE_X;
+        marker.scale.y = EGO_SIZE_Y;
+        marker.scale.z = EGO_SIZE_Z;
         marker.pose.position.x = 0.0f;
         marker.pose.position.y = 0.0f;
-        marker.pose.position.z = 0.0f;
+        marker.pose.position.z = EGO_SIZE_Z/2.0f;
         marker.pose.orientation.w = 1.0;
         marker.pose.orientation.x = 0.0;
         marker.pose.orientation.y = 0.0;
@@ -149,12 +156,12 @@ public:
             /* markers last for 1.2 sec */
             marker.lifetime = ros::Duration(0.0f);
 
-            marker.scale.x = 0.5f;
-            marker.scale.y = 0.5f;
-            marker.scale.z = 1.0f;
+            marker.scale.x = TARGET_SIZE_X;
+            marker.scale.y = TARGET_SIZE_Y;
+            marker.scale.z = TARGET_SIZE_Z;
             marker.pose.position.x = obj.px;
             marker.pose.position.y = obj.py;
-            marker.pose.position.z = 0.0f;
+            marker.pose.position.z = TARGET_SIZE_Z/2.0f;
             marker.pose.orientation.w = 1.0;
             marker.pose.orientation.x = 0.0;
             marker.pose.orientation.y = 0.0;

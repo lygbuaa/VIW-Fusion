@@ -88,7 +88,7 @@ public:
             return nbytes;
         }
 
-        ROS_INFO("recv canid: 0x%03X, len: %d", frame.can_id, frame.can_dlc);
+        // ROS_INFO("recv canid: 0x%03X, len: %d", frame.can_id, frame.can_dlc);
 #if 0
         for (int i = 0; i < frame.can_dlc; i++){
             ROS_INFO("data[%d] = %02X ", i, frame.data[i]);

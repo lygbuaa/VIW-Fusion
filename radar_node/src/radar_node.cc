@@ -25,7 +25,7 @@
 #include <opencv2/opencv.hpp>
 
 #include "MR415Wrapper.h"
-
+#include "CvParamLoader.h"
 
 /* global definition */
 ros::Publisher g_heartbeat_;
@@ -60,6 +60,7 @@ int main(int argc, char **argv)
 
     std::string config_file_path = argv[1];
     ROS_INFO("config_file_path: %s\n", argv[1]);
+    std::shared_ptr<radar::CvParamLoader> g_param_loader_(new radar::CvParamLoader(config_file_path));
 
     g_heartbeat_ = nh.advertise<std_msgs::Int32>("radar_node_heartbeat", 10);
     std::thread heartbeat_thread{heartbeat_process};
@@ -69,9 +70,9 @@ int main(int argc, char **argv)
 
     // g_param_loader_ = std::shared_ptr<CvParamLoader> (new CvParamLoader(config_file_path));
 
-    std::unique_ptr<radar::RadarMR415> ptr_radar(new radar::RadarMR415("vcan0"));
-    ptr_radar -> start_listening(nh);
-    ROS_WARN("waiting for socketcan msg");
+    std::unique_ptr<radar::RadarMR415> ptr_radar(new radar::RadarMR415(g_param_loader_->can_name_));
+    ptr_radar -> start_listening(nh, g_param_loader_->mr415_det_topic_, g_param_loader_->mr415_marker_topic_);
+    ROS_WARN("waiting for can frame on %s", g_param_loader_->can_name_.c_str());
 
     ros::spin();
 
