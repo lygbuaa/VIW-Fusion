@@ -154,7 +154,7 @@ public:
             marker.color.b = 0.0f;
             marker.color.a = 1.0f;
             /* markers last for 1.2 sec */
-            marker.lifetime = ros::Duration(0.0f);
+            marker.lifetime = ros::Duration(0.1f);
 
             marker.scale.x = TARGET_SIZE_X;
             marker.scale.y = TARGET_SIZE_Y;
