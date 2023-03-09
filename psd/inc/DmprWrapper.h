@@ -126,7 +126,7 @@ public:
                         ROS_WARN("deprecate marking point out-of-fence: (%.1f, %.1f)", mp.wx, mp.wy);
                         continue;
                     }
-                    if(marking_point_invalid_direction(mp)){
+                    if(marking_point_invalid_direction_v2(mp)){
                         ROS_WARN("deprecate marking point invalid direction: (%.2f)", mp.direction);
                         continue;
                     }
@@ -164,6 +164,33 @@ public:
         }
         float dir_diff = round_direction(mp.direction - ego_yaw_);
         return fabs((fabs(dir_diff) - M_PI/2.0f)) > M_PI/8.0f;
+    }
+
+    bool marking_point_invalid_direction_v2(MarkingPoint_t& mp){
+        /* only filter T type */
+        if(mp.type != 'T'){
+            return false;
+        }
+
+        // groudtruth of T-type direction
+        const float dir_gt = ego_yaw_ - M_PI/2.0f;
+        const float dir_gts[2] = {
+            round_direction(dir_gt), 
+            round_direction(dir_gt + M_PI)
+        };
+        // ROS_INFO("mp[%d] direction: %.2f, gt: %.2f, %.2f", mp.idx, mp.direction*57.3f, dir_gts[0]*57.3, dir_gts[1]*57.3);
+        for(int i=0; i<2; i++){
+            float dir_diff = round_direction(mp.direction - dir_gts[i]);
+            /* fix direction if we could */
+            if(fabs(dir_diff) < DIRECTION_COVER_TH_){
+                mp.direction = dir_gts[i];
+                // ROS_WARN("fix mp[%d] direction to: %.2f", mp.idx, mp.direction*57.3f);
+                return false;
+            }
+        }
+
+        /* if direction can't be fixed, deprecate it */
+        return true;
     }
 
     void marking_point_add_branches(Detections_t& det){
