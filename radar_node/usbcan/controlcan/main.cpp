@@ -178,8 +178,8 @@ main()
 	config.AccCode=0;
 	config.AccMask=0xFFFFFFFF;
 	config.Filter=1;//接收所有帧
-	config.Timing0=0x03;/*波特率125 Kbps  0x03  0x1C*/
-	config.Timing1=0x1C;
+	config.Timing0=0x00;/*波特率125 Kbps  0x03  0x1C*/
+	config.Timing1=0x1C;/*波特率500 Kbps  0x00  0x1C*/
 	config.Mode=0;//正常模式		
 	
 	if(VCI_InitCAN(VCI_USBCAN2,0,0,&config)!=1)

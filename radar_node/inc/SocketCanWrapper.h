@@ -11,11 +11,9 @@
 #include <linux/can/raw.h>
 #include <errno.h>
 #include <ros/ros.h>
+#include "GlobalDefines.h"
 
 namespace radar{
-
-typedef struct can_frame CanFrameClassical_t;
-
 class SocketCanClassical
 {
 private:
@@ -94,6 +92,15 @@ public:
             ROS_INFO("data[%d] = %02X ", i, frame.data[i]);
         }
 #endif
+        return nbytes;
+    }
+
+    int recv_frame(FrameList_t& frames){
+        CanFrameClassical_t frame;
+        int nbytes = recv_frame(frame);
+        if(nbytes > 0){
+            frames.push(frame);
+        }
         return nbytes;
     }
 

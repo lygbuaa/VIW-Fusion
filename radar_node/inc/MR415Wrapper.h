@@ -3,18 +3,14 @@
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
 #include "SocketCanWrapper.h"
+#include "UsbCanWrapper.h"
 #include "viwo_utils.h"
 #include "radar_node/RadarTarget.h"
 #include "radar_node/RadarDetection.h"
 
 namespace radar{
-/* defined canid */
-constexpr static unsigned int CANID_HEADER = 0x500;
-constexpr static unsigned int CANID_TARGET_A = 0x503;
-constexpr static unsigned int CANID_TARGET_B = 0x504;
-
 struct FrameHeader_t{
-    const unsigned int canid = CANID_HEADER;
+    const unsigned int canid = MR415_HEADER_CANID_;
     /* No_Obj: start=2, len=6 */
     int no_obj = -1;
     /* TunnelFlag: start=0, len=1 */
@@ -32,7 +28,7 @@ struct FrameHeader_t{
 };
 
 struct FrameTargetA_t{
-    const unsigned int canid = CANID_TARGET_A;
+    const unsigned int canid = MR415_TARGET_A_CANID_;
     /* Target1_MsgCnt_A: start=56, len=2 */
     int msgcnt_a = -1;
     /* Target1_ID: start=48, len=8 */
@@ -54,7 +50,7 @@ struct FrameTargetA_t{
 };
 
 struct FrameTargetB_t{
-    const unsigned int canid = CANID_TARGET_B;
+    const unsigned int canid = MR415_TARGET_B_CANID_;
     /* Target1_MsgCnt_B: start=56, len=2 */
     int msgcnt_b = -1;
     /* Target1_ID: start=16, len=8 */
@@ -71,7 +67,7 @@ struct FrameTargetB_t{
     int type = -1;
 };
 
-class RadarMR415 : public SocketCanClassical
+class RadarMR415 : public UsbCanClassical
 {
 private:
     volatile bool alive_ = false;
@@ -83,7 +79,7 @@ private:
 
 public:
     RadarMR415(const std::string can_name)
-    : SocketCanClassical(can_name)
+    : UsbCanClassical(can_name)
     {}
 
     ~RadarMR415(){}
@@ -177,6 +173,8 @@ public:
         0xFF >> 4 = 0x0F
     */
     void process_frame_header(const CanFrameClassical_t& frame){
+        static uint64_t counter = 0;
+        static double start_sec = ros::Time::now().toSec();
         // HANG_STOPWATCH();
         FrameHeader_t frame_header;
         assert(frame.can_id == frame_header.canid);
@@ -197,6 +195,11 @@ public:
 
         g_det_.header = header;
         g_det_.no_obj = frame_header.no_obj;
+
+        ++counter;
+        double now_sec = ros::Time::now().toSec();
+        float fps = counter / (now_sec - start_sec);
+        ROS_INFO("recv 0x500 counter: %ld, fps: %.2f", counter, fps);
     }
 
     void process_frame_target_a(const CanFrameClassical_t& frame){
@@ -248,27 +251,39 @@ public:
 
     void recv_loop(){
         ROS_INFO("start listening to MR415");
+        FrameList_t frames;
+
         while(alive_){
-            /* read frame */
-            CanFrameClassical_t frame;
-            if(recv_frame(frame) < 0){
+            /* read frames */
+            // assert(frames.empty());
+            if(recv_frame(frames) < 0){
                 // ROS_WARN("read frame error!");
                 std::chrono::milliseconds dura(50);
                 continue;
             }
-            /* process frame */
-            switch(frame.can_id){
-                case CANID_HEADER:
-                    process_frame_header(frame);
-                    break;
-                case CANID_TARGET_A:
-                    process_frame_target_a(frame);
-                    break;
-                case CANID_TARGET_B:
-                    process_frame_target_b(frame);
-                    break;
-                default:
-                    ROS_WARN("unsupported canid: 0x%03X", frame.can_id);
+
+            while(!frames.empty()){
+                CanFrameClassical_t frame = frames.front();
+                /* hack 0x505 ~ 0x552, remap canid to 0x503 and 0x504 */
+                if(frame.can_id >= 0x505 && frame.can_id <= 0x552){
+                    frame.can_id = 0x504 - frame.can_id % 2;
+                }
+
+                /* process frame */
+                switch(frame.can_id){
+                    case MR415_HEADER_CANID_:
+                        process_frame_header(frame);
+                        break;
+                    case MR415_TARGET_A_CANID_:
+                        process_frame_target_a(frame);
+                        break;
+                    case MR415_TARGET_B_CANID_:
+                        process_frame_target_b(frame);
+                        break;
+                    default:
+                        ROS_WARN("unsupported canid: 0x%03X", frame.can_id);
+                }
+                frames.pop();
             }
 
         }

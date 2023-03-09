@@ -20,6 +20,9 @@ set(OpenCV_DIR "/usr/local/share/OpenCV")
 find_package(OpenCV REQUIRED)
 message(WARNING "OpenCV_VERSION: ${OpenCV_VERSION}")
 
+set(USBCAN_LIB  ${PROJECT_SOURCE_DIR}/usbcan/controlcan/libcontrolcan.so)
+message(WARNING "USBCAN_LIB: ${USBCAN_LIB}")
+
 add_message_files(
   DIRECTORY msg
   FILES
@@ -37,6 +40,7 @@ generate_messages(
 include_directories(
   ${PROJECT_SOURCE_DIR}/../common/
   ${PROJECT_SOURCE_DIR}/inc/
+  ${PROJECT_SOURCE_DIR}
   )
 
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
@@ -67,4 +71,8 @@ catkin_package(
 )
 
 add_executable(radar_node_bin src/radar_node.cc)
-target_link_libraries(radar_node_bin ${catkin_LIBRARIES} ${OpenCV_LIBS})
+target_link_libraries(radar_node_bin 
+  ${catkin_LIBRARIES} 
+  ${OpenCV_LIBS}
+  ${USBCAN_LIB}
+)

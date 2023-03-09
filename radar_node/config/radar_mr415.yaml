@@ -2,7 +2,7 @@
 
 #common parameters
 project_rootdir: "/home/hugoliu/github/catkin_ws/src/VIW-Fusion/"
-can_name: "vcan0"
+can_name: "0"  #"vcan0" or "0"
 
 mr415_det_topic: "mr415_detection"
 mr415_marker_topic: "mr415_markers"

@@ -74,6 +74,8 @@ int main(int argc, char **argv)
     ptr_radar -> start_listening(nh, g_param_loader_->mr415_det_topic_, g_param_loader_->mr415_marker_topic_);
     ROS_WARN("waiting for can frame on %s", g_param_loader_->can_name_.c_str());
 
+    // std::unique_ptr<radar::UsbCanClassical> ptr_usbcan(new radar::UsbCanClassical("0"));
+
     ros::spin();
 
     ptr_radar -> stop_listening();
