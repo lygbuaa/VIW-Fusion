@@ -67,7 +67,12 @@ struct FrameTargetB_t{
     int type = -1;
 };
 
-class RadarMR415 : public UsbCanClassical
+class RadarMR415
+#if USBCAN_0_SOCKETCAN_1 == 0
+    :public UsbCanClassical
+#elif USBCAN_0_SOCKETCAN_1 == 1
+    :public SocketCanClassical
+#endif
 {
 private:
     volatile bool alive_ = false;
@@ -79,7 +84,11 @@ private:
 
 public:
     RadarMR415(const std::string can_name)
-    : UsbCanClassical(can_name)
+#if USBCAN_0_SOCKETCAN_1 == 0
+    :UsbCanClassical(can_name)
+#elif USBCAN_0_SOCKETCAN_1 == 1
+    :SocketCanClassical(can_name)
+#endif
     {}
 
     ~RadarMR415(){}

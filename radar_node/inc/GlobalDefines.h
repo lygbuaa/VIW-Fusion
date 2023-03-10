@@ -11,6 +11,8 @@
 
 namespace radar
 {
+#define USBCAN_0_SOCKETCAN_1 0
+
 #ifndef M_PI
 #define M_PI 3.14159265f
 #endif

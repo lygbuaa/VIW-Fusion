@@ -7,4 +7,39 @@ can_name: "0"  #"vcan0" or "0"
 mr415_det_topic: "mr415_detection"
 mr415_marker_topic: "mr415_markers"
 
+image_width: 1920
+image_height: 1080
 
+#pixel_size = 2.8um, lens_efl = 2.666mm
+k_front: !!opencv-matrix
+  rows: 3
+  cols: 3
+  dt: d
+  data: [952.1,  0.0,     960.0,
+         0.0,    952.1,   540.0,
+         0.0,    0.0,     1.0  ]
+
+# [k1, k3] = [2.66822668, -0.18649677]
+d_kb: !!opencv-matrix
+  rows: 2
+  cols: 1
+  dt: d
+  data: [2.668,
+         -0.186]
+
+t_radar_to_camera: !!opencv-matrix
+  rows: 3
+  cols: 1
+  dt: d
+  data: [0.0,
+         0.0,
+         0.0]
+
+# pitch-roll-yaw
+euler_radar_to_camera: !!opencv-matrix
+  rows: 3
+  cols: 1
+  dt: d
+  data: [0.0,
+         0.0,
+         0.0]
