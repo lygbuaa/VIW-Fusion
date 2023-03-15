@@ -2,13 +2,15 @@
 
 #common parameters
 project_rootdir: "/home/hugoliu/github/catkin_ws/src/VIW-Fusion/"
-can_name: "0"  #"vcan0" or "0"
+can_name: "vcan0"  #"vcan0" for socketcan or "0" for usbcan
 
 mr415_det_topic: "mr415_detection"
 mr415_marker_topic: "mr415_markers"
 
 image_width: 1920
 image_height: 1080
+pixel_size_um: 2.8
+lens_efl_mm: 2.666
 
 #pixel_size = 2.8um, lens_efl = 2.666mm
 k_front: !!opencv-matrix
@@ -19,7 +21,7 @@ k_front: !!opencv-matrix
          0.0,    952.1,   540.0,
          0.0,    0.0,     1.0  ]
 
-# [k1, k3] = [2.66822668, -0.18649677]
+# distortion kb model, [k1, k3] = [2.66822668, -0.18649677]
 d_kb: !!opencv-matrix
   rows: 2
   cols: 1
@@ -27,6 +29,9 @@ d_kb: !!opencv-matrix
   data: [2.668,
          -0.186]
 
+# x-forward, + means radar is front of camera
+# y-left, + means radar on the left of camera
+# z-up, + means radar is on top of camera
 t_radar_to_camera: !!opencv-matrix
   rows: 3
   cols: 1
@@ -35,7 +40,10 @@ t_radar_to_camera: !!opencv-matrix
          0.0,
          0.0]
 
-# pitch-roll-yaw
+# euler angles in right-hand, pitch: +Y, roll: +X, yaw: -Z
+# pitch: + means radar is looking down
+# roll: + means radar is tilting right
+# yaw: + means radar is looking right
 euler_radar_to_camera: !!opencv-matrix
   rows: 3
   cols: 1

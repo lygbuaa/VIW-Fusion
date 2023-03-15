@@ -26,6 +26,7 @@
 
 #include "MR415Wrapper.h"
 #include "CvParamLoader.h"
+#include "CameraDisplay.h"
 
 /* global definition */
 ros::Publisher g_heartbeat_;
@@ -65,16 +66,15 @@ int main(int argc, char **argv)
     g_heartbeat_ = nh.advertise<std_msgs::Int32>("radar_node_heartbeat", 10);
     std::thread heartbeat_thread{heartbeat_process};
 
-    // readParameters(config_file);
-    // estimator.setParameter();
-
-    // g_param_loader_ = std::shared_ptr<CvParamLoader> (new CvParamLoader(config_file_path));
-
     std::unique_ptr<radar::RadarMR415> ptr_radar(new radar::RadarMR415(g_param_loader_->can_name_));
+    ptr_radar -> init_params(g_param_loader_);
     ptr_radar -> start_listening(nh, g_param_loader_->mr415_det_topic_, g_param_loader_->mr415_marker_topic_);
     ROS_WARN("waiting for can frame on %s", g_param_loader_->can_name_.c_str());
 
     // std::unique_ptr<radar::UsbCanClassical> ptr_usbcan(new radar::UsbCanClassical("0"));
+
+    std::unique_ptr<radar::CameraDisplay> ptr_disp(new radar::CameraDisplay(g_param_loader_));
+    ptr_disp -> init(nh);
 
     ros::spin();
 

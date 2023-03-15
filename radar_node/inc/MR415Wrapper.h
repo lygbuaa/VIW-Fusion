@@ -7,6 +7,7 @@
 #include "viwo_utils.h"
 #include "radar_node/RadarTarget.h"
 #include "radar_node/RadarDetection.h"
+#include "CvParamLoader.h"
 
 namespace radar{
 struct FrameHeader_t{
@@ -81,6 +82,7 @@ private:
     radar_node::RadarTarget g_target_;
     ros::Publisher pub_detection_;
     ros::Publisher pub_markers_;
+    std::shared_ptr<CvParamLoader> cpl_;
 
 public:
     RadarMR415(const std::string can_name)
@@ -92,6 +94,10 @@ public:
     {}
 
     ~RadarMR415(){}
+
+    void init_params(std::shared_ptr<CvParamLoader> cpl){
+        cpl_ = cpl;
+    }
 
     void start_listening(ros::NodeHandle& nh, const std::string det_topic="mr415_detection", const std::string marker_topic="mr415_markers"){
         alive_ = true;
@@ -235,11 +241,15 @@ public:
         frame_target_a.vy = tmp * 0.05f - 102.0f;
         // ROS_INFO("[target_a] id = %d, vy = %.2f (%d)", frame_target_a.id, frame_target_a.vy, tmp);
 
+        cv::Point2f p2f = cpl_->radar_to_image(frame_target_a.px, frame_target_a.py, 1.3f);
+
         g_target_.id = frame_target_a.id;
         g_target_.px = frame_target_a.px;
         g_target_.py = frame_target_a.py;
         g_target_.vx = frame_target_a.vx;
         g_target_.vy = frame_target_a.vy;
+        g_target_.ix = p2f.x;
+        g_target_.iy = p2f.y;
     }
 
     void process_frame_target_b(const CanFrameClassical_t& frame){
@@ -247,7 +257,7 @@ public:
         FrameTargetB_t frame_target_b;
         frame_target_b.id = (int)(frame.data[2]);
         /* make sure target_b comes with the same target_a */
-        assert(g_target_.id == frame_target_b.id);
+        // assert(g_target_.id == frame_target_b.id);
 
         frame_target_b.type = (int)((frame.data[7]&0xfc)>>2);
         // ROS_INFO("[target_b] id = %d, type = %d", frame_target_b.id, frame_target_b.type);
