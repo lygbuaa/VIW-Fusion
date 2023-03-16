@@ -21,6 +21,7 @@ namespace radar
 constexpr static unsigned int MR415_HEADER_CANID_ = 0x500;
 constexpr static unsigned int MR415_TARGET_A_CANID_ = 0x503;
 constexpr static unsigned int MR415_TARGET_B_CANID_ = 0x504;
+constexpr static float MR415_FAKE_TARGET_HEIGHT_ = 1.0f;
 
 typedef struct can_frame CanFrameClassical_t;
 typedef std::queue<CanFrameClassical_t> FrameList_t;

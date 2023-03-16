@@ -130,7 +130,11 @@ public:
         const double& cx0 = m31_cp.at<double>(0, 0);
         const double& cy0 = m31_cp.at<double>(1, 0);
         const double& cz = m31_cp.at<double>(2, 0);
-        assert(cz > 0.0f);
+        // assert(cz > 0.0f);
+        if(cz < 0.01f){
+            ROS_WARN("invalid m31:cp: %s", ViwoUtils::CvMat2Str(m31_cp).c_str());
+            return m31_cp_dist;
+        }
         const double& k1 = d_kb_.at<double>(0, 0);
         const double& k3 = d_kb_.at<double>(1, 0);
         double r0 = sqrt(cx0*cx0 + cy0*cy0);

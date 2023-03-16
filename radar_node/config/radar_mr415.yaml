@@ -29,16 +29,16 @@ d_kb: !!opencv-matrix
   data: [2.668,
          -0.186]
 
-# x-forward, + means radar is front of camera
-# y-left, + means radar on the left of camera
-# z-up, + means radar is on top of camera
+# x-forward, +1.0 means radar is front of camera 1.0m
+# y-left, +1.0 means radar on the left of camera 1.0m
+# z is camera height, radar don't need z, -1.3 means camera height 1.3m
 t_radar_to_camera: !!opencv-matrix
   rows: 3
   cols: 1
   dt: d
   data: [0.0,
          0.0,
-         0.0]
+         -1.3]
 
 # euler angles in right-hand, pitch: +Y, roll: +X, yaw: -Z
 # pitch: + means radar is looking down

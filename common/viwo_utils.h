@@ -46,7 +46,7 @@ public:
     }
 
     /* small mat debug print */
-    static std::string CvMat2Str(cv::Mat& mat){
+    static std::string CvMat2Str(const cv::Mat& mat){
         cv::Mat oneRow = mat.reshape(0, 1);
         std::ostringstream os;
         os << oneRow;

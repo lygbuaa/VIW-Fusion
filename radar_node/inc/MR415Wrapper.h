@@ -241,7 +241,7 @@ public:
         frame_target_a.vy = tmp * 0.05f - 102.0f;
         // ROS_INFO("[target_a] id = %d, vy = %.2f (%d)", frame_target_a.id, frame_target_a.vy, tmp);
 
-        cv::Point2f p2f = cpl_->radar_to_image(frame_target_a.px, frame_target_a.py, 1.3f);
+        cv::Point2f p2f = cpl_->radar_to_image(frame_target_a.px, frame_target_a.py, MR415_FAKE_TARGET_HEIGHT_);
 
         g_target_.id = frame_target_a.id;
         g_target_.px = frame_target_a.px;
@@ -263,9 +263,28 @@ public:
         // ROS_INFO("[target_b] id = %d, type = %d", frame_target_b.id, frame_target_b.type);
 
         g_target_.type = frame_target_b.type;
-        ROS_INFO("add new target, id = %d, type = %d, px = %.2f, py = %.2f, vx = %.2f, vy = %.2f", \
-            g_target_.id, g_target_.type, g_target_.px, g_target_.py, g_target_.vx, g_target_.vy);
-        g_det_.objs.push_back(g_target_);
+
+        if(is_valid_target(g_target_)){
+            ROS_INFO("add new target, id = %d, type = %d, px = %.2f, py = %.2f, vx = %.2f, vy = %.2f", \
+                g_target_.id, g_target_.type, g_target_.px, g_target_.py, g_target_.vx, g_target_.vy);
+            g_det_.objs.push_back(g_target_);
+        }
+    }
+
+    bool is_valid_target(const radar_node::RadarTarget& target){
+        /* filter distance */
+        if(g_target_.px < 0.05f || g_target_.px > 15.0f){
+            return false;
+        }
+
+        for(const radar_node::RadarTarget& obj : g_det_.objs){
+            /* filter duplicate target */
+            if(obj.id == target.id){
+                return false;
+            }
+        }
+
+        return true;
     }
 
     void recv_loop(){
