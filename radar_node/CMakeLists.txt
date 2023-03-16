@@ -20,9 +20,6 @@ set(OpenCV_DIR "/usr/local/share/OpenCV")
 find_package(OpenCV REQUIRED)
 message(WARNING "OpenCV_VERSION: ${OpenCV_VERSION}")
 
-set(USBCAN_LIB  ${PROJECT_SOURCE_DIR}/usbcan/controlcan/libcontrolcan.so)
-message(WARNING "USBCAN_LIB: ${USBCAN_LIB}")
-
 add_message_files(
   DIRECTORY msg
   FILES
@@ -47,7 +44,15 @@ set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 
 EXECUTE_PROCESS(COMMAND uname -m COMMAND tr -d '\n' OUTPUT_VARIABLE ARCHITECTURE)
 MESSAGE(STATUS "cpu architecture: ${ARCHITECTURE}")
+if(${ARCHITECTURE} STREQUAL "x86_64")
+  set(USBCAN_LIB ${PROJECT_SOURCE_DIR}/usbcan/controlcan/libcontrolcan_x64.so)
+elseif(${ARCHITECTURE} STREQUAL "aarch64")
+  set(USBCAN_LIB ${PROJECT_SOURCE_DIR}/usbcan/controlcan/libcontrolcan_arm64.so)
+else()
+  MESSAGE(FATAL_ERROR "invalid cpu architecture!")
+endif()
 
+message(WARNING "USBCAN_LIB: ${USBCAN_LIB}")
 
 find_package(Eigen3)
 include_directories(
