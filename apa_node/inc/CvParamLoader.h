@@ -4,6 +4,7 @@
 #include <eigen3/Eigen/Dense>
 #include <opencv2/core/eigen.hpp>
 #include <ros/ros.h>
+#include <ros/package.h>
 #include "viwo_utils.h"
 #include "DmprDefines.h"
 
@@ -98,6 +99,12 @@ public:
         }
     }
 
+    /* project path is <apa_node_path>/../  */
+    std::string get_project_path(const std::string& pkg_name = "apa_node"){
+        std::string pkg_path = ros::package::getPath(pkg_name);
+        return pkg_path + "/../";
+    }
+
     void load_params(){
         fs_["bev_h"] >> g_params_.BEV_H_;
         fs_["bev_w"] >> g_params_.BEV_W_;
@@ -128,7 +135,10 @@ public:
         // fs_["homo_svc_rear"] >> g_params_.HOMO_SVC_REAR_;
         // fs_["homo_svc_right"] >> g_params_.HOMO_SVC_RIGHT_;
 
-        fs_["project_rootdir"] >> project_rootdir_;
+        // fs_["project_rootdir"] >> project_rootdir_;
+        project_rootdir_ = get_project_path("apa_node");
+        ROS_INFO("project_rootdir_: %s", project_rootdir_.c_str());
+
         fs_["output_path"] >> output_path_;
         output_path_ = project_rootdir_ + output_path_;
 
