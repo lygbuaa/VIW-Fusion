@@ -1,0 +1,107 @@
+%YAML:1.0
+
+#common parameters
+project_rootdir: "/home/hugoliu/github/catkin_ws/src/VIW-Fusion/"
+
+image_front_topic: "/carla/ego_vehicle/camera_svc_front/image"
+image_left_topic: "/carla/ego_vehicle/camera_svc_left/image"
+image_rear_topic: "/carla/ego_vehicle/camera_svc_rear/image"
+image_right_topic: "/carla/ego_vehicle/camera_svc_right/image"
+
+imu_topic: "/carla/ego_vehicle/imu"
+wheel_topic: "/carla/ego_vehicle/odometry" 
+
+dmpr_model_path: "psd/model/dmpr.onnx"
+output_path: "output"
+dataset_path: "dataset"
+car_top_image_path: "apa_node/assets/car_top.png"
+
+image_width: 800
+image_height: 450
+
+bev_h: 512
+bev_w: 512
+bev_xmax: 16.0
+bev_ymax: 16.0
+
+k_svc_34: !!opencv-matrix
+  rows: 3
+  cols: 4
+  dt: d
+  data: [230.940,  0.0,     400.0,    0.0,
+         0.0,      230.940, 225.0,    0.0,
+         0.0,      0.0,     1.0,      0.0]
+
+t_svc_front_31: !!opencv-matrix
+  rows: 3
+  cols: 1
+  dt: d
+  data: [1.10,
+         0.0,
+         1.00]
+
+t_svc_left_31: !!opencv-matrix
+  rows: 3
+  cols: 1
+  dt: d
+  data: [0.0,
+         -0.74,
+         1.00]
+
+t_svc_rear_31: !!opencv-matrix
+  rows: 3
+  cols: 1
+  dt: d
+  data: [-1.10,
+         0.0,
+         1.00]
+
+t_svc_right_31: !!opencv-matrix
+  rows: 3
+  cols: 1
+  dt: d
+  data: [0.0,
+         0.74,
+         1.00]
+
+euler_svc_front_31: !!opencv-matrix
+  rows: 3
+  cols: 1
+  dt: d
+  data: [20.0,
+         0.0,
+         0.0]
+
+euler_svc_left_31: !!opencv-matrix
+  rows: 3
+  cols: 1
+  dt: d
+  data: [20.0,
+         0.0,
+         90.0]
+
+euler_svc_rear_31: !!opencv-matrix
+  rows: 3
+  cols: 1
+  dt: d
+  data: [20.0,
+         0.0,
+         180.0]
+
+euler_svc_right_31: !!opencv-matrix
+  rows: 3
+  cols: 1
+  dt: d
+  data: [20.0,
+         0.0,
+         270.0]
+
+r0_cam_to_body: !!opencv-matrix
+  rows: 3
+  cols: 3
+  dt: d
+  data: [0.0,  0.0,  1.0,
+         1.0,  0.0,  0.0,
+         0.0,  -1.0, 0.0]
+
+delay_svc_right: 0.0
