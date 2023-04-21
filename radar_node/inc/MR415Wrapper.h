@@ -10,63 +10,7 @@
 #include "CvParamLoader.h"
 
 namespace radar{
-struct FrameHeader_t{
-    const unsigned int canid = MR415_HEADER_CANID_;
-    /* No_Obj: start=2, len=6 */
-    int no_obj = -1;
-    /* TunnelFlag: start=0, len=1 */
-    int tunnel_flag = -1;
-    /* CIPV_ID: start=16, len=8 */
-    int cipv_id = -1;
-    /* ACC_CIPV_ID: start=24, len=8 */
-    int acc_cipv_id = -1;
-    /* AEB_CIPV_ID: start=32, len=8 */
-    int aeb_cipv_id = -1;
-    /* Func_Status: start=8, len=8 */
-    int func_status = -1;
-    /* Radar_Frame: start=56, len=16 */
-    int radar_frame = -1;
-};
 
-struct FrameTargetA_t{
-    const unsigned int canid = MR415_TARGET_A_CANID_;
-    /* Target1_MsgCnt_A: start=56, len=2 */
-    int msgcnt_a = -1;
-    /* Target1_ID: start=48, len=8 */
-    int id = -1;
-    /* Target1_Pos_X: start=12, len=12, Offset=0m, Resolution=0.125m */
-    float px = 0.0f;
-    /* Target1_Pos_Y: start=16, len=12, Offset=0m, Resolution=0.125m */
-    float py = 0.0f;
-    /* Target1_Vel_X: start=36, len=12, Offset=-102m/s, Resolution=0.05m/s */
-    float vx = 0.0f;
-    /* Target1_Vel_Y: start=40, len=12, Offset=-102m/s, Resolution=0.05m/s */
-    float vy = 0.0f;
-    /* Target1_CIPVFlag: start=59, len=1 */
-    int cipv_flag = -1;
-    /* Target1_ACC_CIPVFlag: start=63, len=1 */
-    int acc_cipv_flag = -1;
-    /* Target1_AEB_CIPVFlag: start=62, len=1 */
-    int aeb_cipv_flag = -1;
-};
-
-struct FrameTargetB_t{
-    const unsigned int canid = MR415_TARGET_B_CANID_;
-    /* Target1_MsgCnt_B: start=56, len=2 */
-    int msgcnt_b = -1;
-    /* Target1_ID: start=16, len=8 */
-    int id = -1;
-    /* Target1_Accel_X: start=12, len=12, Offset=-40m/s^2, Resolution=0.04m/s^2 */
-    float ax = 0.0f;
-    /* Target1_MeasStat: start=29, len=3 */
-    int meas_stat = -1;
-    /* Target1_DynProp: start=24, len=3 */
-    int dyn_prop = -1;
-    /* Target1_ProbOfExist: start=48, len=2 */
-    int prob_exist = -1;
-    /* Target1_Type: start=58, len=6, 0=unknow, 1=pedestrian, 2=bike, 3=car, 4=truck */
-    int type = -1;
-};
 
 class RadarMR415
 #if USBCAN_0_SOCKETCAN_1 == 0
@@ -78,8 +22,15 @@ class RadarMR415
 private:
     volatile bool alive_ = false;
     std::unique_ptr<std::thread> pworker_ = nullptr;
-    radar_node::RadarDetection g_det_;
-    radar_node::RadarTarget g_target_;
+    radar_node::RadarDetection g_det_front_;
+    radar_node::RadarTarget g_target_front_;
+    
+    radar_node::RadarDetection g_det_front_left_;
+    radar_node::RadarTarget g_target_front_left_;
+
+    radar_node::RadarDetection g_det_front_right_;
+    radar_node::RadarTarget g_target_front_right_;
+
     ros::Publisher pub_detection_;
     ros::Publisher pub_markers_;
     std::shared_ptr<CvParamLoader> cpl_;
@@ -99,10 +50,11 @@ public:
         cpl_ = cpl;
     }
 
+    /* only publish mr415_detection, sr439_detection will be fused */
     void start_listening(ros::NodeHandle& nh, const std::string det_topic="mr415_detection", const std::string marker_topic="mr415_markers"){
         alive_ = true;
         pub_detection_ = nh.advertise<radar_node::RadarDetection>(det_topic, 100);
-        pub_markers_ = nh.advertise<visualization_msgs::MarkerArray>(marker_topic, 100);
+        // pub_markers_ = nh.advertise<visualization_msgs::MarkerArray>(marker_topic, 100);
         pworker_ = std::unique_ptr<std::thread> (new std::thread(&RadarMR415::recv_loop, this));
     }
 
@@ -111,6 +63,270 @@ public:
         pworker_ -> join();
     }
 
+    /*
+        input: g_det_front_, g_det_front_left_, g_det_front_right_
+        output: g_det_front_
+        fusion in the same recv thread, so we don't need mutex.
+    */
+    void try_fusion(){
+        /* just use now() as timestamp_front */
+        double ts_f = ros::Time::now().toSec();
+
+        // if(g_det_front_.objs.size() > 0){
+        //     ts_f = g_det_front_.header.stamp.toSec();
+        // }
+
+        const double ts_fl = g_det_front_left_.header.stamp.toSec();
+        const double ts_fr = g_det_front_right_.header.stamp.toSec();
+
+        if(fabs(ts_f - ts_fl) < 0.1f){
+            /* fusion latest front && front_left */
+            /* traverse evey sr439 target, transform into mr415 coord, then compute iou with mr415 target */
+        }
+
+        if(fabs(ts_f - ts_fr) < 0.1f){
+            /* fusion latest front && front_right */
+        }
+
+    }
+
+    /*
+        0x8F >> 4 = 0x08
+        0xFF >> 4 = 0x0F
+    */
+    void process_mr415_header(const CanFrameClassical_t& frame){
+        /* publish detection of last cycle, filter empty no_obj in case of 0x503 comes first */
+        try_fusion();
+        if(g_det_front_.no_obj > 0){
+            pub_detection_.publish(g_det_front_);
+            ROS_INFO("[fusion] publish mr415_detection, no_obj = %d", g_det_front_.no_obj);
+        }
+
+        static uint64_t counter = 0;
+        static double start_sec = ros::Time::now().toSec();
+        // HANG_STOPWATCH();
+        MR415Header_t frame_header;
+        assert(frame.can_id == frame_header.canid);
+        frame_header.no_obj = (int)(frame.data[0] >> 2);
+
+        /* clear detection */
+        g_det_front_.objs.clear();
+        std_msgs::Header header;
+        header.frame_id = "world";
+        header.stamp = ros::Time(ros::Time::now().toSec());
+
+        g_det_front_.header = header;
+        g_det_front_.no_obj = frame_header.no_obj;
+
+        ++counter;
+        double now_sec = ros::Time::now().toSec();
+        float fps = counter / (now_sec - start_sec);
+        ROS_INFO("[mr415] header counter: %ld, fps: %.2f", counter, fps);
+    }
+
+    void process_mr415_target_a(const CanFrameClassical_t& frame){
+        // HANG_STOPWATCH();
+        MR415TargetA_t frame_target_a;
+        frame_target_a.id = (int)(frame.data[6]);
+
+        unsigned int tmp = ((frame.data[0]&0xff)<<4) + ((frame.data[1]&0xf0)>>4);
+        frame_target_a.px = tmp * 0.125f;
+        // ROS_INFO("[target_a] id = %d, px = %.2f (%d)", frame_target_a.id, frame_target_a.px, tmp);
+
+        tmp &= 0x0;
+        tmp = ((frame.data[1]&0x0f)<<8) + (frame.data[2]&0xff);
+        frame_target_a.py = tmp * 0.125f - 128.0f;
+        // ROS_INFO("[target_a] id = %d, py = %.2f (%d)", frame_target_a.id, frame_target_a.py, tmp);
+
+        tmp &= 0x0;
+        tmp = ((frame.data[3]&0xff)<<4) + ((frame.data[4]&0xf0)>>4);
+        frame_target_a.vx = tmp * 0.05f - 102.0f;
+        // ROS_INFO("[target_a] id = %d, vx = %.2f (%d)", frame_target_a.id, frame_target_a.vx, tmp);
+
+        tmp &= 0x0;
+        tmp = ((frame.data[4]&0x0f)<<8) + (frame.data[5]&0xff);
+        frame_target_a.vy = tmp * 0.05f - 102.0f;
+        // ROS_INFO("[target_a] id = %d, vy = %.2f (%d)", frame_target_a.id, frame_target_a.vy, tmp);
+
+        cv::Point2f p2f = cpl_->radar_to_image(frame_target_a.px, frame_target_a.py, MR415_FAKE_TARGET_HEIGHT_);
+
+        g_target_front_.id = frame_target_a.id;
+        g_target_front_.px = frame_target_a.px;
+        g_target_front_.py = frame_target_a.py;
+        g_target_front_.vx = frame_target_a.vx;
+        g_target_front_.vy = frame_target_a.vy;
+        g_target_front_.ix = p2f.x;
+        g_target_front_.iy = p2f.y;
+        g_target_front_.domain = radar_node::RadarTarget::FRONT;
+
+        /* ignore target_b, in case of message loss */
+        if(is_valid_target(g_target_front_)){
+            ROS_INFO("[mr415] target, id = %d, type = %d, px = %.2f, py = %.2f, vx = %.2f, vy = %.2f", \
+                g_target_front_.id, g_target_front_.type, g_target_front_.px, g_target_front_.py, g_target_front_.vx, g_target_front_.vy);
+            g_det_front_.objs.push_back(g_target_front_);
+        }
+    }
+
+#if 0
+    /* target_b is useless */
+    void process_mr415_target_b(const CanFrameClassical_t& frame){
+        // HANG_STOPWATCH();
+        MR415TargetB_t frame_target_b;
+        frame_target_b.id = (int)(frame.data[2]);
+        /* make sure target_b comes with the same target_a */
+        // assert(g_target_front_.id == frame_target_b.id);
+
+        frame_target_b.type = (int)((frame.data[7]&0xfc)>>2);
+        // ROS_INFO("[target_b] id = %d, type = %d", frame_target_b.id, frame_target_b.type);
+
+        g_target_front_.type = frame_target_b.type;
+
+        if(is_valid_target(g_target_front_)){
+            ROS_INFO("add new target, id = %d, type = %d, px = %.2f, py = %.2f, vx = %.2f, vy = %.2f", \
+                g_target_front_.id, g_target_front_.type, g_target_front_.px, g_target_front_.py, g_target_front_.vx, g_target_front_.vy);
+            g_det_front_.objs.push_back(g_target_front_);
+        }
+    }
+#endif
+
+    bool is_valid_target(const radar_node::RadarTarget& target){
+        /* filter distance */
+        if(g_target_front_.px < 0.05f || g_target_front_.px > 15.0f){
+            return false;
+        }
+
+        for(const radar_node::RadarTarget& obj : g_det_front_.objs){
+            /* filter duplicate target */
+            if(obj.id == target.id){
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    void process_sr439_header(const RadarDomain_t domain, const CanFrameClassical_t& frame){
+        // HANG_STOPWATCH();
+        static uint64_t counter = 0;
+        static double start_sec = ros::Time::now().toSec();
+
+        SR439Header_t sr439_header;
+        sr439_header.no_obj = (int)(frame.data[0]);
+        sr439_header.counter = ((frame.data[1]&0x0f)<<8) + (frame.data[2]&0xff);
+        ROS_INFO("[sr439] header domain: %d, no_obj: %d, counter: %d", (int)domain, sr439_header.no_obj, sr439_header.counter);
+
+        std_msgs::Header header;
+        header.frame_id = "world";
+        header.stamp = ros::Time(ros::Time::now().toSec());
+
+        if(domain == RadarDomain_t::LEFT_FRONT){
+            g_det_front_left_.objs.clear();
+            g_det_front_left_.header = header;
+            g_det_front_left_.no_obj = sr439_header.no_obj;
+
+        }else if(domain == RadarDomain_t::RIGHT_FRONT){
+            g_det_front_right_.objs.clear();
+            g_det_front_right_.header = header;
+            g_det_front_right_.no_obj = sr439_header.no_obj;
+
+        }else{
+            ROS_ERROR("invalid radar domain!");
+            return;
+        }
+
+        ++counter;
+        double now_sec = ros::Time::now().toSec();
+        float fps = counter / (now_sec - start_sec);
+        ROS_INFO("[sr439] header counter: %ld, fps: %.2f", counter, fps);
+    }
+
+    void process_sr439_obj_general(const RadarDomain_t domain, const CanFrameClassical_t& frame){
+        // HANG_STOPWATCH();
+
+        SR439ObjGeneral_t obj_gen;
+        obj_gen.id = (int)(frame.data[0]);
+        unsigned int tmp = 0x0;
+        tmp = ((frame.data[1]&0xff)<<4) + ((frame.data[2]&0xf0)>>4);
+        obj_gen.px = tmp*0.125f - 60.0f;
+        tmp &= 0x0;
+        tmp = ((frame.data[2]&0x0f)<<8) + (frame.data[3]&0xff);
+        obj_gen.py = tmp*0.125f - 128.0f;
+
+        ROS_INFO("[sr439] domain: %d, obj id: %d, px: %.2f, py: %.2f", (int)domain, obj_gen.id, obj_gen.px, obj_gen.py);
+
+        if(domain == RadarDomain_t::LEFT_FRONT){
+            g_target_front_left_.domain = radar_node::RadarTarget::LEFT_FRONT;
+            g_target_front_left_.px = obj_gen.px;
+            g_det_front_left_.objs.push_back(g_target_front_left_);
+        }else if(domain == RadarDomain_t::RIGHT_FRONT){
+            g_target_front_right_.domain = radar_node::RadarTarget::RIGHT_FRONT;
+            g_target_front_right_.py = obj_gen.py;
+            g_det_front_right_.objs.push_back(g_target_front_right_);
+        }else{
+            ROS_ERROR("[sr439] invalid radar domain!");
+        }
+    }
+
+    void recv_loop(){
+        ROS_INFO("start listening to MR415");
+        FrameList_t frames;
+
+        while(alive_){
+            /* read frames */
+            // assert(frames.empty());
+            if(recv_frame(frames) < 0){
+                // ROS_WARN("read frame error!");
+                std::chrono::milliseconds dura(50);
+                continue;
+            }
+
+            while(!frames.empty()){
+                CanFrameClassical_t frame = frames.front();
+                /* hack 0x505 ~ 0x552, remap canid to 0x503 and 0x504 */
+                if(frame.can_id >= 0x505 && frame.can_id <= 0x552){
+                    frame.can_id = 0x504 - frame.can_id % 2;
+                }
+
+                /* process frame */
+                switch(frame.can_id){
+                    case MR415_HEADER_CANID_:
+                        process_mr415_header(frame);
+                        break;
+                    case MR415_TARGET_A_CANID_:
+                        process_mr415_target_a(frame);
+                        break;
+                    case MR415_TARGET_B_CANID_:
+                        // process_mr415_target_b(frame);
+                        break;
+                    case SR439_FL_HEADER_CANID_:
+                        process_sr439_header(RadarDomain_t::LEFT_FRONT, frame);
+                        break;
+                    case SR439_FR_HEADER_CANID_:
+                    case SR439_RL_HEADER_CANID_:
+                    case SR439_RR_HEADER_CANID_:
+                        process_sr439_header(RadarDomain_t::RIGHT_FRONT, frame);
+                        break;
+                    case SR439_FL_OBJ_GENERAL_CANID_:
+                        process_sr439_obj_general(RadarDomain_t::LEFT_FRONT, frame);
+                        break;
+                    case SR439_FR_OBJ_GENERAL_CANID_:
+                    case SR439_RL_OBJ_GENERAL_CANID_:
+                    case SR439_RR_OBJ_GENERAL_CANID_:
+                        process_sr439_obj_general(RadarDomain_t::RIGHT_FRONT, frame);
+                        break;
+                    default:
+                        ROS_INFO("unsupported canid: 0x%03X", frame.can_id);
+                }
+                frames.pop();
+            }
+
+        }
+        ROS_INFO("stop listening to MR415");
+    }
+
+private:
+
+#if 0
     void publish_markers(){
         constexpr static float EGO_SIZE_X = 1.0f;
         constexpr static float EGO_SIZE_Y = 0.2f;
@@ -152,7 +368,7 @@ public:
 
         markerArray_msg.markers.push_back(marker);
 
-        for(const radar_node::RadarTarget& obj : g_det_.objs){
+        for(const radar_node::RadarTarget& obj : g_det_front_.objs){
             visualization_msgs::Marker marker;
             marker.header = header;
             marker.id = obj.id;
@@ -182,151 +398,7 @@ public:
         }
         pub_markers_.publish(markerArray_msg);
     }
-
-    /*
-        0x8F >> 4 = 0x08
-        0xFF >> 4 = 0x0F
-    */
-    void process_frame_header(const CanFrameClassical_t& frame){
-        static uint64_t counter = 0;
-        static double start_sec = ros::Time::now().toSec();
-        // HANG_STOPWATCH();
-        FrameHeader_t frame_header;
-        assert(frame.can_id == frame_header.canid);
-        frame_header.no_obj = (int)(frame.data[0] >> 2);
-
-        /* publish detection of last cycle, filter empty no_obj in case of 0x503 comes first */
-        if(g_det_.no_obj > 0){
-            pub_detection_.publish(g_det_);
-            ROS_INFO("publish mr415_detection, no_obj = %d", g_det_.no_obj);
-            publish_markers();
-        }
-
-        /* clear detection */
-        g_det_.objs.clear();
-        std_msgs::Header header;
-        header.frame_id = "world";
-        header.stamp = ros::Time(ros::Time::now().toSec());
-
-        g_det_.header = header;
-        g_det_.no_obj = frame_header.no_obj;
-
-        ++counter;
-        double now_sec = ros::Time::now().toSec();
-        float fps = counter / (now_sec - start_sec);
-        ROS_INFO("recv 0x500 counter: %ld, fps: %.2f", counter, fps);
-    }
-
-    void process_frame_target_a(const CanFrameClassical_t& frame){
-        // HANG_STOPWATCH();
-        FrameTargetA_t frame_target_a;
-        frame_target_a.id = (int)(frame.data[6]);
-
-        unsigned int tmp = ((frame.data[0]&0xff)<<4) + ((frame.data[1]&0xf0)>>4);
-        frame_target_a.px = tmp * 0.125f;
-        // ROS_INFO("[target_a] id = %d, px = %.2f (%d)", frame_target_a.id, frame_target_a.px, tmp);
-
-        tmp &= 0x0;
-        tmp = ((frame.data[1]&0x0f)<<8) + (frame.data[2]&0xff);
-        frame_target_a.py = tmp * 0.125f - 128.0f;
-        // ROS_INFO("[target_a] id = %d, py = %.2f (%d)", frame_target_a.id, frame_target_a.py, tmp);
-
-        tmp &= 0x0;
-        tmp = ((frame.data[3]&0xff)<<4) + ((frame.data[4]&0xf0)>>4);
-        frame_target_a.vx = tmp * 0.05f - 102.0f;
-        // ROS_INFO("[target_a] id = %d, vx = %.2f (%d)", frame_target_a.id, frame_target_a.vx, tmp);
-
-        tmp &= 0x0;
-        tmp = ((frame.data[4]&0x0f)<<8) + (frame.data[5]&0xff);
-        frame_target_a.vy = tmp * 0.05f - 102.0f;
-        // ROS_INFO("[target_a] id = %d, vy = %.2f (%d)", frame_target_a.id, frame_target_a.vy, tmp);
-
-        cv::Point2f p2f = cpl_->radar_to_image(frame_target_a.px, frame_target_a.py, MR415_FAKE_TARGET_HEIGHT_);
-
-        g_target_.id = frame_target_a.id;
-        g_target_.px = frame_target_a.px;
-        g_target_.py = frame_target_a.py;
-        g_target_.vx = frame_target_a.vx;
-        g_target_.vy = frame_target_a.vy;
-        g_target_.ix = p2f.x;
-        g_target_.iy = p2f.y;
-    }
-
-    void process_frame_target_b(const CanFrameClassical_t& frame){
-        // HANG_STOPWATCH();
-        FrameTargetB_t frame_target_b;
-        frame_target_b.id = (int)(frame.data[2]);
-        /* make sure target_b comes with the same target_a */
-        // assert(g_target_.id == frame_target_b.id);
-
-        frame_target_b.type = (int)((frame.data[7]&0xfc)>>2);
-        // ROS_INFO("[target_b] id = %d, type = %d", frame_target_b.id, frame_target_b.type);
-
-        g_target_.type = frame_target_b.type;
-
-        if(is_valid_target(g_target_)){
-            ROS_INFO("add new target, id = %d, type = %d, px = %.2f, py = %.2f, vx = %.2f, vy = %.2f", \
-                g_target_.id, g_target_.type, g_target_.px, g_target_.py, g_target_.vx, g_target_.vy);
-            g_det_.objs.push_back(g_target_);
-        }
-    }
-
-    bool is_valid_target(const radar_node::RadarTarget& target){
-        /* filter distance */
-        if(g_target_.px < 0.05f || g_target_.px > 15.0f){
-            return false;
-        }
-
-        for(const radar_node::RadarTarget& obj : g_det_.objs){
-            /* filter duplicate target */
-            if(obj.id == target.id){
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    void recv_loop(){
-        ROS_INFO("start listening to MR415");
-        FrameList_t frames;
-
-        while(alive_){
-            /* read frames */
-            // assert(frames.empty());
-            if(recv_frame(frames) < 0){
-                // ROS_WARN("read frame error!");
-                std::chrono::milliseconds dura(50);
-                continue;
-            }
-
-            while(!frames.empty()){
-                CanFrameClassical_t frame = frames.front();
-                /* hack 0x505 ~ 0x552, remap canid to 0x503 and 0x504 */
-                if(frame.can_id >= 0x505 && frame.can_id <= 0x552){
-                    frame.can_id = 0x504 - frame.can_id % 2;
-                }
-
-                /* process frame */
-                switch(frame.can_id){
-                    case MR415_HEADER_CANID_:
-                        process_frame_header(frame);
-                        break;
-                    case MR415_TARGET_A_CANID_:
-                        process_frame_target_a(frame);
-                        break;
-                    case MR415_TARGET_B_CANID_:
-                        process_frame_target_b(frame);
-                        break;
-                    default:
-                        ROS_WARN("unsupported canid: 0x%03X", frame.can_id);
-                }
-                frames.pop();
-            }
-
-        }
-        ROS_INFO("stop listening to MR415");
-    }
+#endif
 
 };
 
