@@ -28,6 +28,7 @@
 #include "DmprWrapper.h"
 #include "CvParamLoader.h"
 #include "ipm_composer.h"
+#include "logging_utils.h"
 
 IPM_PARAMS_t g_params_;
 std::queue<sensor_msgs::ImuConstPtr> imu_buf_;
@@ -210,6 +211,7 @@ int main(int argc, char **argv)
     ros::init(argc, argv, "apa_ros_node");
     ros::NodeHandle n("~");
     ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug);
+    _run_logger_test_();
 
     if(argc != 2)
     {
